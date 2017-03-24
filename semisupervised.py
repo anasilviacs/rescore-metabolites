@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 
 """
 This script takes in a csv file which is the export of a sm-engine search done
-with the additional feature extraction. From this output (i.e. annotations), we
+with the additional feature extraction. From this output (i.e. annotations),
 we build a linear SVM model which is used to re-score all the annotations.
 """
 
@@ -67,19 +67,18 @@ def get_FDR_threshold(pos, neg, thr=0.10):
             c_neg += 1
     return 999
 
+# Defining identifier variables
 name = args.dataset.split('/')[-1].rstrip('.csv')
 data = pd.read_csv(args.dataset, sep='\t')
-savepath = args.dataset.split('/')[0] + '/new_fdr/' + args.dataset.split('/')[-2] + '/'
+savepath = args.dataset.split('/')[0] + '/halfleftout_loosefdr/' + args.dataset.split('/')[-2] + '/'
 print('dataset {}. result will be saved at {}'.format(name, savepath))
 
-# adding boolean "target" column which is 1 if target, 0 if decoy. depends on adduct.
+# adding columns of interest to the dataframe
 data['target'] = [1 if data.adduct[r] in ['+Na', '+K', '+H'] else 0 for r in range(len(data))]
-# adding boolean above_fdr column, 1 if fdr level is 10% or less, 0 otherwise. decoys have fdr = 0
 data['above_fdr'] = [1 if data.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(data))]
-# adding column with msm score: moc * spatial * spectral
 data['msm'] = data['chaos'] * data['spatial'] * data['spectral']
 
-# list with all the features
+# list with all the features used to build the model
 features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
         'image_corr_03','image_corr_12', 'image_corr_13', 'image_corr_23',
         'percent_0s','peak_int_diff_0', 'peak_int_diff_1', 'peak_int_diff_2',
@@ -89,7 +88,7 @@ features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
         'ratio_peak_01', 'ratio_peak_02', 'ratio_peak_03', 'ratio_peak_12',
         'ratio_peak_13', 'ratio_peak_23', 'snr', 'msm']
 
-# EMBL features
+# EMBL features:
 # features = ['chaos', 'spatial', 'spectral', 'msm']
 
 # splitting the data
@@ -103,30 +102,31 @@ data_pos = data[data.target == 1]
 # data_neg = data.loc[neg_idx[:n/2]]
 # data_out = data.loc[neg_idx[n/2:]]
 # instead, shuffle and select equal number of decoys (compared to targets).
-# neg_idx = data[data.target == 0].index.values
-# np.random.seed(42)
-# np.random.shuffle(neg_idx)
-# data_neg = data.loc[neg_idx[:len(data_pos)]]
-# data_out = data.loc[neg_idx[len(data_pos):2*len(data_pos)]]
+neg_idx = data[data.target == 0].index.values
+np.random.seed(42)
+np.random.shuffle(neg_idx)
+data_neg = data.loc[neg_idx[:len(data_pos)]]
+data_out = data.loc[neg_idx[len(data_pos):2*len(data_pos)]]
 # Not splitting the decoys: using everything!
-data_neg = data[data.target == 0]
+# data_neg = data[data.target == 0]
 # data is now all targets + same number of decoys
 data = pd.concat([data_pos, data_neg])
 
 # we must keep track of the sf/sf_name/adduct for the final output.
 # the model will need info on if an annotation is above_fdr and if it's a target
 X = data[features + ['sf_name', 'sf', 'adduct', 'above_fdr', 'target']]
-# X_out = data_out[features + ['sf_name', 'sf', 'adduct', 'above_fdr', 'target']]
-# X_out['target'] = [0] * len(X_out)
+X_out = data_out[features + ['sf_name', 'sf', 'adduct', 'above_fdr', 'target']]
+X_out['target'] = [0] * len(X_out)
 
 # the data must be scaled. will use sklearn.preprocessing.StandardScaler
 scaler = StandardScaler()
 X.loc[:, features] = scaler.fit_transform(X.loc[:, features].values)
 # the left out decoys must be scaled by the same factor
-# X_out.loc[:, features] = scaler.transform(X_out.loc[:, features].values)
+X_out.loc[:, features] = scaler.transform(X_out.loc[:, features].values)
 
-# when trying out FDR values we try everything from 0.01 to 0.60 in 0.01 steps
-fdrs = np.linspace(0.01, 0.60, num=60)
+# When selecting the next batch of positive cases we test several FDR values
+# fdrs = np.linspace(0.01, 0.60, num=60)
+fdrs = np.linspace(0.05, 0.30, 26)
 # initial FDR level is 10%
 fdr_level = 0.10
 
@@ -226,15 +226,15 @@ final.fit(X_train, y_train)
 
 
 # I am using all the data now, so this isn't necessary
-# X_all = pd.concat([X, X_out])
-# X_all['target'] = pd.concat([X['target'], X_out.target])
-# X_all['final_label'] = [None] * len(X_all)
+X_all = pd.concat([X, X_out])
+X_all['target'] = pd.concat([X['target'], X_out.target])
+X_all['final_label'] = [None] * len(X_all)
 
 # final re-scoring of all annotations
-# X_all['final_score'] = final.decision_function(X_all[features])
+X_all['final_score'] = final.decision_function(X_all[features])
 X['final_score'] = final.decision_function(X[features])
 
-"""
+# """
 # computing FDR threshold for final score
 threshs = [get_FDR_threshold(X_all[X_all.target == 1]['final_score'], X_all[X_all.target == 0]['final_score'], thr=i) for i in fdrs]
 thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
@@ -276,12 +276,12 @@ ax.set_xlabel('False Positive Rate')
 ax.set_ylabel('True Positive Rate')
 ax.legend(loc='lower right', prop={'size':15})
 final_roc.savefig(savepath + name + '/' +name+'_final_roc.png')
-"""
+# """
 
 # I want to save the annotation identifiers, the features, if it's a target, above_fdr,
 # the final score and the final label. I want the features to not be scaled!
-# to_save = X_all[['sf_name', 'sf', 'adduct', 'target'] + features + ['above_fdr', 'final_score', 'final_label']]
-to_save = X[['sf_name', 'sf', 'adduct', 'target'] + features + ['final_score']]
+to_save = X_all[['sf_name', 'sf', 'adduct', 'target'] + features + ['above_fdr', 'final_score', 'final_label']]
+# to_save = X[['sf_name', 'sf', 'adduct', 'target'] + features + ['final_score']]
 to_save[features] = scaler.inverse_transform(to_save[features])
 to_save.to_csv(savepath + name + '/data/' +name+'_rescored.csv', index=False)
 
