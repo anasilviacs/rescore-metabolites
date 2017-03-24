@@ -27,6 +27,7 @@ parser.add_argument('dataset', type=str, help='path to dataset')
 
 args = parser.parse_args()
 
+print("\n*ReSCORE METASPACE*\n")
 
 def get_FDR_threshold(pos, neg, thr=0.10):
     """
@@ -67,11 +68,12 @@ def get_FDR_threshold(pos, neg, thr=0.10):
             c_neg += 1
     return 999
 
-# Defining identifier variables
+# Loading data
+print('loading data...\n')
 name = args.dataset.split('/')[-1].rstrip('.csv')
 data = pd.read_csv(args.dataset, sep='\t')
 savepath = args.dataset.split('/')[0] + '/tests/' + args.dataset.split('/')[-2] + '/'
-print('dataset {}. result will be saved at {}'.format(name, savepath))
+print('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
 
 # Adding columns of interest to the dataframe
 data['target'] = [1 if data.adduct[r] in ['+Na', '+K', '+H'] else 0 for r in range(len(data))]
@@ -91,24 +93,17 @@ features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
 # EMBL features:
 # features = ['chaos', 'spatial', 'spectral', 'msm']
 
+print('splitting and scaling the data\n')
+
 # splitting the data:
 # all the target hits
 data_pos = data[data.target == 1]
-# # shuffle indices for decoy hits and split in half
-# neg_idx = data[data.target == 0].index.values
-# np.random.seed(42)
-# np.random.shuffle(neg_idx)
-# n = len(neg_idx)
-# data_neg = data.loc[neg_idx[:n/2]]
-# data_out = data.loc[neg_idx[n/2:]]
 # same number of decoys
 neg_idx = data[data.target == 0].index.values
 np.random.seed(42)
 np.random.shuffle(neg_idx)
 data_neg = data.loc[neg_idx[:len(data_pos)]]
 data_out = data.loc[neg_idx[len(data_pos):2*len(data_pos)]]
-# Not splitting the decoys: using everything!
-# data_neg = data[data.target == 0]
 
 # data is now all targets + same number of decoys
 data = pd.concat([data_pos, data_neg])
@@ -135,13 +130,9 @@ if not os.path.exists(savepath + name + '/'):
     os.makedirs(savepath + name + '/data/')
 
 log = open(savepath + name + '/' +name+ '_log.txt', 'w')
-# log.write("Initial number of identifications at 10% FDR: {} \n".format(X.above_fdr.value_counts()[1]))
 
+print('starting iterative process:\n')
 for it in range(10):
-    # how many annotations are above the FDR threshold:
-    print("Iteration {}: # identified at {} FDR: {}".format(it+1, fdr_level, np.sum(X['above_fdr'])))
-    log.write("Iteration {}: # identified at {} FDR: {} \n".format(it+1, fdr_level, np.sum(X['above_fdr'])))
-
     # set cv scheme - to guarantee that there are positive training examples on each fold,
     # we select a random permutation of all unique sum formulas that are above and below fdr
     cv_abovefdr = np.random.permutation(data[X.above_fdr == 1].sf.unique())
@@ -183,30 +174,32 @@ for it in range(10):
         # use this model to re-score the test set. the
         X.loc[X.fold == f, 'fold_score'] = bst.decision_function(X_test)
 
-    # After the 5 folds are done, every annotation has been re-scored
 
     # Selecting positive instances for next fold:
-    # compute FDR for new threshold. we test different fdr levels, defined in fdrs
+    # compute FDR for new score
     threshs = [get_FDR_threshold(X[X.target == 1]['fold_score'], X[X.target == 0]['fold_score'], thr=i) for i in fdrs]
     nids = [len(X[(X.target == 1) & (X.fold_score > score)]) for score in threshs]
     nids_threshs = [a > 10 for a in nids]
+
     # we select the threshold for the minimum of all fdr levels tested that allows for at least 10 identifications
     # thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
     nid = list(compress(nids, nids_threshs))[0]
     thresh = list(compress(threshs, nids_threshs))[0]
     fdr_level = list(compress(fdrs, nids_threshs))[0]
     # print(thresh, fdr_level, nid)
+
     # update X['above_fdr'] in accordance to the new score/fdr level
     X.loc[:, 'above_fdr'] = [1 if ((X.loc[i, 'fold_score'] > thresh) & X.loc[i, 'target'] == 1) else 0 for i in X.index]
 
     end = time.time()
-    print("Iteration {} took {}s; {} ids at {} FDR".format(it+1, end-start, nid, fdr_level))
+    print("Iteration {} took {}s; {} ids at {} FDR".format(it+1, str(end-start).split('.')[0], nid, fdr_level))
     log.write("Iteration {} took {}s; {} ids at {} FDR".format(it+1, end-start, nid, fdr_level))
     print(" -------------------")
     log.write(" -------------------\n")
 
 
 # Final model
+print('training final model\n')
 X_train = X[(X.above_fdr == 1) | (X.target == 0)][features]
 y_train = X[(X.above_fdr == 1) | (X.target == 0)]['target']
 
@@ -219,12 +212,13 @@ X_all['final_label'] = [None] * len(X_all)
 
 # final re-scoring of all annotations (including left out decoys)
 X_all['final_score'] = final.decision_function(X_all[features])
-X['final_score'] = final.decision_function(X[features])
 
+print('un-scaling features and saving results\n')
 # De-scaling the features; saving dataframe with results
-to_save = X[['sf_name', 'sf', 'adduct', 'target'] + features + ['final_score']]
+to_save = X_all[['sf_name', 'sf', 'adduct', 'target'] + features + ['final_score']]
 to_save[features] = scaler.inverse_transform(to_save[features])
 to_save.to_csv(savepath + name + '/data/' +name+'_rescored.csv', index=False)
+
 
 # Saving feature weights
 importances = final.coef_
@@ -239,3 +233,4 @@ ax.set_xlim([-1, len(features)])
 feat_imp.savefig(savepath + name + '/' +name+'_feat_importances.png')
 
 log.close()
+print('finished!')
