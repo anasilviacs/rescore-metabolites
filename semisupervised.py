@@ -31,7 +31,7 @@ args = parser.parse_args()
 def get_FDR_threshold(pos, neg, thr=0.10):
     """
     Gets the score threshold that permits a defined FDR. FDR is calculated as
-    ((#decoys abov threshold/#decoys) / (#targets above threshold/#targets).
+    ((#decoys above threshold/#decoys) / (#targets above threshold/#targets).
     :param pos: pandas DF column [label] elements where [label] is [positive]
     :param neg: pandas DF column [label] elements where [label] is [negative]
     :param thr: the permitted FDR. default 10%
