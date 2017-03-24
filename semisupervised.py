@@ -72,7 +72,7 @@ def get_FDR_threshold(pos, neg, thr=0.10):
 print('loading data...\n')
 name = args.dataset.split('/')[-1].rstrip('.csv')
 data = pd.read_csv(args.dataset, sep='\t')
-savepath = args.dataset.split('/')[0] + '/tests/' + args.dataset.split('/')[-2] + '/'
+savepath = args.dataset.split('/')[0] + '/all_features/' + args.dataset.split('/')[-2] + '/'
 print('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
 
 # Adding columns of interest to the dataframe
@@ -93,7 +93,10 @@ features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
 # EMBL features:
 # features = ['chaos', 'spatial', 'spectral', 'msm']
 
-print('splitting and scaling the data\n')
+print('using following features:\n')
+print(features)
+
+print('\nsplitting and scaling the data\n')
 
 # splitting the data:
 # all the target hits
@@ -171,7 +174,7 @@ for it in range(10):
         bst = LinearSVC(class_weight='balanced', random_state=42)
         bst.fit(X_train, y_train)
 
-        # use this model to re-score the test set. the
+        # use this model to re-score the test set
         X.loc[X.fold == f, 'fold_score'] = bst.decision_function(X_test)
 
 
