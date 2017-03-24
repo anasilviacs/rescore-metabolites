@@ -70,15 +70,15 @@ def get_FDR_threshold(pos, neg, thr=0.10):
 # Defining identifier variables
 name = args.dataset.split('/')[-1].rstrip('.csv')
 data = pd.read_csv(args.dataset, sep='\t')
-savepath = args.dataset.split('/')[0] + '/halfleftout_loosefdr/' + args.dataset.split('/')[-2] + '/'
+savepath = args.dataset.split('/')[0] + '/tests/' + args.dataset.split('/')[-2] + '/'
 print('dataset {}. result will be saved at {}'.format(name, savepath))
 
-# adding columns of interest to the dataframe
+# Adding columns of interest to the dataframe
 data['target'] = [1 if data.adduct[r] in ['+Na', '+K', '+H'] else 0 for r in range(len(data))]
 data['above_fdr'] = [1 if data.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(data))]
 data['msm'] = data['chaos'] * data['spatial'] * data['spectral']
 
-# list with all the features used to build the model
+# List with all the features used to build the model
 features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
         'image_corr_03','image_corr_12', 'image_corr_13', 'image_corr_23',
         'percent_0s','peak_int_diff_0', 'peak_int_diff_1', 'peak_int_diff_2',
@@ -91,8 +91,8 @@ features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
 # EMBL features:
 # features = ['chaos', 'spatial', 'spectral', 'msm']
 
-# splitting the data
-# all the target hits:
+# splitting the data:
+# all the target hits
 data_pos = data[data.target == 1]
 # # shuffle indices for decoy hits and split in half
 # neg_idx = data[data.target == 0].index.values
@@ -101,7 +101,7 @@ data_pos = data[data.target == 1]
 # n = len(neg_idx)
 # data_neg = data.loc[neg_idx[:n/2]]
 # data_out = data.loc[neg_idx[n/2:]]
-# instead, shuffle and select equal number of decoys (compared to targets).
+# same number of decoys
 neg_idx = data[data.target == 0].index.values
 np.random.seed(42)
 np.random.shuffle(neg_idx)
@@ -109,19 +109,18 @@ data_neg = data.loc[neg_idx[:len(data_pos)]]
 data_out = data.loc[neg_idx[len(data_pos):2*len(data_pos)]]
 # Not splitting the decoys: using everything!
 # data_neg = data[data.target == 0]
+
 # data is now all targets + same number of decoys
 data = pd.concat([data_pos, data_neg])
 
-# we must keep track of the sf/sf_name/adduct for the final output.
-# the model will need info on if an annotation is above_fdr and if it's a target
-X = data[features + ['sf_name', 'sf', 'adduct', 'above_fdr', 'target']]
-X_out = data_out[features + ['sf_name', 'sf', 'adduct', 'above_fdr', 'target']]
+# identifier columns
+X = data[features + ['sf_name', 'sf', 'adduct', 'target', 'above_fdr']]
+X_out = data_out[features + ['sf_name', 'sf', 'adduct', 'target', 'above_fdr']]
 X_out['target'] = [0] * len(X_out)
 
-# the data must be scaled. will use sklearn.preprocessing.StandardScaler
+# Scaling the data
 scaler = StandardScaler()
 X.loc[:, features] = scaler.fit_transform(X.loc[:, features].values)
-# the left out decoys must be scaled by the same factor
 X_out.loc[:, features] = scaler.transform(X_out.loc[:, features].values)
 
 # When selecting the next batch of positive cases we test several FDR values
@@ -130,20 +129,13 @@ fdrs = np.linspace(0.05, 0.30, 26)
 # initial FDR level is 10%
 fdr_level = 0.10
 
-# create the directories where outputs are saved
+# Output directories
 if not os.path.exists(savepath + name + '/'):
     os.makedirs(savepath + name + '/')
     os.makedirs(savepath + name + '/data/')
-# log file
+
 log = open(savepath + name + '/' +name+ '_log.txt', 'w')
 # log.write("Initial number of identifications at 10% FDR: {} \n".format(X.above_fdr.value_counts()[1]))
-
-# start the figure with the ROC curves
-roc_fig, ax = plt.subplots(figsize=(7, 7))
-ax.plot([0, 1], [0, 1], 'k--', label='Luck')
-ax.set_xlabel('False Positive Rate')
-ax.set_ylabel('True Positive Rate')
-ax.set_title('ROC curves for each model iteration')
 
 for it in range(10):
     # how many annotations are above the FDR threshold:
@@ -191,101 +183,50 @@ for it in range(10):
         # use this model to re-score the test set. the
         X.loc[X.fold == f, 'fold_score'] = bst.decision_function(X_test)
 
-    # After the 5 folds are done, every annotation has been re-scored. we save
-    # the roc plots for the fold scores:
-    fpr, tpr, _ = metrics.roc_curve(X.target, X.fold_score.astype('float'), pos_label=1)
-    ax.plot(fpr, tpr, label='it. {}, auc={:.2f}'.format(it+1, metrics.auc(fpr, tpr)))
+    # After the 5 folds are done, every annotation has been re-scored
 
+    # Selecting positive instances for next fold:
     # compute FDR for new threshold. we test different fdr levels, defined in fdrs
     threshs = [get_FDR_threshold(X[X.target == 1]['fold_score'], X[X.target == 0]['fold_score'], thr=i) for i in fdrs]
-    # we select the threshold for the minimum of all fdr levels tested
-    thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
-    fdr_level = list(compress(fdrs, [t != 999 for t in threshs]))[0]
+    nids = [len(X[(X.target == 1) & (X.fold_score > score)]) for score in threshs]
+    nids_threshs = [a > 10 for a in nids]
+    # we select the threshold for the minimum of all fdr levels tested that allows for at least 10 identifications
+    # thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
+    nid = list(compress(nids, nids_threshs))[0]
+    thresh = list(compress(threshs, nids_threshs))[0]
+    fdr_level = list(compress(fdrs, nids_threshs))[0]
+    # print(thresh, fdr_level, nid)
     # update X['above_fdr'] in accordance to the new score/fdr level
     X.loc[:, 'above_fdr'] = [1 if ((X.loc[i, 'fold_score'] > thresh) & X.loc[i, 'target'] == 1) else 0 for i in X.index]
 
     end = time.time()
-    print("Iteration {} took {}s; model AUC = {}".format(it+1, end-start, metrics.auc(fpr, tpr)))
-    log.write("Iteration {} took {:.3f}s; model AUC = {:.4f} \n".format(it+1, end-start, metrics.auc(fpr, tpr)))
+    print("Iteration {} took {}s; {} ids at {} FDR".format(it+1, end-start, nid, fdr_level))
+    log.write("Iteration {} took {}s; {} ids at {} FDR".format(it+1, end-start, nid, fdr_level))
     print(" -------------------")
     log.write(" -------------------\n")
 
-# save roc_fig
-ax.legend(loc='lower right', prop={'size':10})
-roc_fig.savefig(savepath + name + '/roc_' +name+'.png')
 
-
-# now for the "final model" where the left-out decoys are brought back in.
-# these are only re-scored, to validate the model's performance
-
+# Final model
 X_train = X[(X.above_fdr == 1) | (X.target == 0)][features]
 y_train = X[(X.above_fdr == 1) | (X.target == 0)]['target']
 
 final = LinearSVC(class_weight='balanced', random_state=42)
 final.fit(X_train, y_train)
 
-
-# I am using all the data now, so this isn't necessary
 X_all = pd.concat([X, X_out])
 X_all['target'] = pd.concat([X['target'], X_out.target])
 X_all['final_label'] = [None] * len(X_all)
 
-# final re-scoring of all annotations
+# final re-scoring of all annotations (including left out decoys)
 X_all['final_score'] = final.decision_function(X_all[features])
 X['final_score'] = final.decision_function(X[features])
 
-# """
-# computing FDR threshold for final score
-threshs = [get_FDR_threshold(X_all[X_all.target == 1]['final_score'], X_all[X_all.target == 0]['final_score'], thr=i) for i in fdrs]
-thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
-fdr_level = list(compress(fdrs, [t != 999 for t in threshs]))[0]
-X_all.loc[:, 'above_fdr'] = [1 if X_all.loc[i, 'final_score'] > thresh else 0 for i in X_all.index]
-
-# labeling annotations as:
-# "N": decoys, the negative class
-# "TP": targets above FDR threshold
-# "FP": targets below FDR threshold
-X_all['final_label'] = [None] * len(X_all)
-X_all.loc[X_all.target == 0, 'final_label'] = 'N'
-X_all.loc[(X_all.target == 1) & (X_all.above_fdr == 1), 'final_label'] = 'TP'
-X_all.loc[(X_all.target == 1) & (X_all.above_fdr == 0), 'final_label'] = 'FP'
-# histogram an boxplot of scores divided by the final label.
-# y-axis is log-scaled
-score_hist = sns.FacetGrid(X_all, hue='final_label', size=7)
-score_hist.map(sns.distplot, 'final_score', bins=50, kde=False, rug=False).add_legend()
-score_hist.set(xlabel='Final SVM score', ylabel='Frequency', yscale='log', title='Distribution of final scores by final label')
-score_hist.savefig(savepath + name + '/final_scores_hist.png')
-
-plt.figure()
-score_box = sns.boxplot(data=X_all, x='final_label', y='final_score')
-score_box_fig = score_box.get_figure()
-score_box_fig.savefig(savepath + name + '/final_scores_box.png')
-
-print("Final FDR level = {}. # identifications: {} \n".format(fdr_level, X_all.final_label.value_counts()['TP']))
-log.write("Final FDR level = {}. # identifications: {} \n".format(fdr_level, X_all.final_label.value_counts()['TP']))
-
-# roc curve for the final model
-final_roc, ax = plt.subplots(1, 1, figsize=(7, 7))
-fpr, tpr, _ = metrics.roc_curve(X_all['target'], X_all['final_score'], pos_label=1)
-ax.plot(fpr, tpr, label='SVM')
-ax.set_title('Final ROC. AUC = {:.2f}'.format(metrics.auc(fpr, tpr)))
-ax.plot([0, 1], [0, 1], 'k--', label='Luck')
-fpr, tpr, _ = metrics.roc_curve(X_all['target'], X_all['msm'], pos_label=1)
-ax.plot(fpr, tpr, label='MSM')
-ax.set_xlabel('False Positive Rate')
-ax.set_ylabel('True Positive Rate')
-ax.legend(loc='lower right', prop={'size':15})
-final_roc.savefig(savepath + name + '/' +name+'_final_roc.png')
-# """
-
-# I want to save the annotation identifiers, the features, if it's a target, above_fdr,
-# the final score and the final label. I want the features to not be scaled!
-to_save = X_all[['sf_name', 'sf', 'adduct', 'target'] + features + ['above_fdr', 'final_score', 'final_label']]
-# to_save = X[['sf_name', 'sf', 'adduct', 'target'] + features + ['final_score']]
+# De-scaling the features; saving dataframe with results
+to_save = X[['sf_name', 'sf', 'adduct', 'target'] + features + ['final_score']]
 to_save[features] = scaler.inverse_transform(to_save[features])
 to_save.to_csv(savepath + name + '/data/' +name+'_rescored.csv', index=False)
 
-# Also, a plot of the features' weights
+# Saving feature weights
 importances = final.coef_
 indices = np.argsort(importances[::-1])
 
