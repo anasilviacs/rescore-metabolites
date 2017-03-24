@@ -72,7 +72,7 @@ def get_FDR_threshold(pos, neg, thr=0.10):
 print('loading data...\n')
 name = args.dataset.split('/')[-1].rstrip('.csv')
 data = pd.read_csv(args.dataset, sep='\t')
-savepath = args.dataset.split('/')[0] + '/all_features/' + args.dataset.split('/')[-2] + '/'
+savepath = args.dataset.split('/')[0] + '/tests/' + args.dataset.split('/')[-2] + '/'
 print('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
 
 # Adding columns of interest to the dataframe
@@ -106,7 +106,7 @@ neg_idx = data[data.target == 0].index.values
 np.random.seed(42)
 np.random.shuffle(neg_idx)
 data_neg = data.loc[neg_idx[:len(data_pos)]]
-data_out = data.loc[neg_idx[len(data_pos):2*len(data_pos)]]
+data_out = data.loc[neg_idx[len(data_pos):]]
 
 # data is now all targets + same number of decoys
 data = pd.concat([data_pos, data_neg])
@@ -123,7 +123,7 @@ X_out.loc[:, features] = scaler.transform(X_out.loc[:, features].values)
 
 # When selecting the next batch of positive cases we test several FDR values
 # fdrs = np.linspace(0.01, 0.60, num=60)
-fdrs = np.linspace(0.05, 0.30, 26)
+fdrs = np.linspace(0.01, 0.30, 30)
 # initial FDR level is 10%
 fdr_level = 0.10
 
