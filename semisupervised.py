@@ -105,8 +105,11 @@ data_pos = data[data.target == 1]
 neg_idx = data[data.target == 0].index.values
 np.random.seed(42)
 np.random.shuffle(neg_idx)
-data_neg = data.loc[neg_idx[:len(data_pos)]]
-data_out = data.loc[neg_idx[len(data_pos):]]
+# data_neg = data.loc[neg_idx[:len(data_pos)]]
+# data_out = data.loc[neg_idx[len(data_pos):]]
+# twicethe targets
+data_neg = data.loc[neg_idx[:len(data_pos)*2]]
+data_out = data.loc[neg_idx[len(data_pos)*2:]]
 
 # data is now all targets + same number of decoys
 data = pd.concat([data_pos, data_neg])
