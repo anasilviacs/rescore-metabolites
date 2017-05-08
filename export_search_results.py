@@ -44,14 +44,17 @@ if __name__ == "__main__":
     db = DB(SMConfig.get_conf()['db'])
 
     ds_config = db.select_one(DS_CONFIG_SEL, args.ds_name)[0]
+
+    target_adducts = ds_config['isotope_generation']['adducts']
+
     isotope_gen_config = ds_config['isotope_generation']
     charge = '{}{}'.format(isotope_gen_config['charge']['polarity'], isotope_gen_config['charge']['n_charges'])
     export_rs = db.select(EXPORT_SEL, ds_config['database']['name'], args.ds_name,
                           isotope_gen_config['isocalc_sigma'], charge, isotope_gen_config['isocalc_pts_per_mz'])
 
     header = '\t'.join(['formula_db', 'db_ids', 'sf_name', 'sf', 'adduct']) +'\t' + '\t'.join(metrics) + '\t' + \
-             '\t'.join(['fdr', 'isocalc_sigma', 'isocalc_charge', 'isocalc_pts_per_mz', 'first_peak_mz']) + '\n'
+             '\t'.join(['fdr', 'isocalc_sigma', 'isocalc_charge', 'isocalc_pts_per_mz', 'first_peak_mz', 'targets']) + '\n'
     with open(args.csv_path, 'w') as f:
         f.write(header)
-        f.writelines(['\t'.join(map(str, row)) + '\n' for row in export_rs])
+        f.writelines(['\t'.join(map(str, row)) + '\t' + str(target_adducts) + '\n' for row in export_rs])
     logger.info('Exported all search results for "%s" dataset into "%s" file', args.ds_name, args.csv_path)
