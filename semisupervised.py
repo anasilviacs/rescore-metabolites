@@ -72,11 +72,20 @@ def get_FDR_threshold(pos, neg, thr=0.10):
 print('loading data...\n')
 name = args.dataset.split('/')[-1].rstrip('.csv')
 data = pd.read_csv(args.dataset, sep='\t')
+
+# Output directories
 savepath = args.dataset.split('/')[0] + '/tests/' + args.dataset.split('/')[-2] + '/'
+if not os.path.exists(savepath + name + '/'):
+    os.makedirs(savepath + name + '/')
+    os.makedirs(savepath + name + '/data/')
+
+log = open(savepath + name + '/' +name+ '_log.txt', 'w')
+
 print('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
 
 # Adding columns of interest to the dataframe
-data['target'] = [1 if data.adduct[r] in ['+Na', '+K', '+H'] else 0 for r in range(len(data))]
+print('target adducts are {}\n'.format(data.targets[0]))
+data['target'] = [1 if data.adduct[r] in data.targets[0] else 0 for r in range(len(data))]
 data['above_fdr'] = [1 if data.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(data))]
 data['msm'] = data['chaos'] * data['spatial'] * data['spectral']
 
@@ -129,13 +138,6 @@ X_out.loc[:, features] = scaler.transform(X_out.loc[:, features].values)
 fdrs = np.linspace(0.01, 0.30, 30)
 # initial FDR level is 10%
 fdr_level = 0.10
-
-# Output directories
-if not os.path.exists(savepath + name + '/'):
-    os.makedirs(savepath + name + '/')
-    os.makedirs(savepath + name + '/data/')
-
-log = open(savepath + name + '/' +name+ '_log.txt', 'w')
 
 print('starting iterative process:\n')
 for it in range(10):
