@@ -11,10 +11,13 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
-from sklearn.grid_search import GridSearchCV
+# from sklearn.grid_search import GridSearchCV
+from sklearn.model_selection import GridSearchCV
 from sklearn.svm import LinearSVC
 from sklearn import metrics
+
 warnings.filterwarnings("ignore")
+np.random.seed(42)
 
 """
 This script takes in a csv file which is the export of a sm-engine search done
@@ -88,6 +91,7 @@ print('target adducts are {}\n'.format(data.targets[0]))
 data['target'] = [1 if data.adduct[r] in data.targets[0] else 0 for r in range(len(data))]
 data['above_fdr'] = [1 if data.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(data))]
 data['msm'] = data['chaos'] * data['spatial'] * data['spectral']
+print('there are {} targets and {} decoys. of all the targets, {} are above the 10% FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], data.above_fdr.value_counts()[1]))
 
 # List with all the features used to build the model
 features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
