@@ -125,10 +125,26 @@ data['ScanNr'] = np.arange(len(data))
 data['Peptide'] = ['R.'+sf+'.T' for sf in data['sf']]
 data['Proteins'] = data['sf']
 
-
 # Split by target
-# Sample eq. number of decoys
-# Send to Percolator
-# Read results
-# Aggregate results
-# Write results
+for target in target_adducts:
+    data_pos = data[data.target == target]
+    data_neg = #TODO sample 1 decoy adduct for each sf
+
+    data_perc = pd.concat([data_pos, data_neg])
+    data_perc = data[['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']]
+    data_perc.to_csv(...) #TODO good way to name the files for perc to read in.
+    # From Sven:
+    with open("%s" % (args.spec_file + ".target.pin")) as f:
+        row = f.readline()
+        header = row.split('\t')[0:-1]
+        for row in f:
+            l = row.rstrip().split('\t')
+            pin_map[l[0]] = l[0:len(header)]
+
+    # Send to Percolator
+    command = "percolator -U %s > %s.out" % (args.spec_file + ".target.pin", args.spec_file + ".target.pin")
+    os.system(command)
+
+    # Read results
+    # Aggregate results
+    # Write results
