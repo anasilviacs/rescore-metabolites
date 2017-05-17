@@ -87,8 +87,10 @@ log = open(savepath + name + '/' +name+ '_log.txt', 'w')
 print('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
 
 # Adding columns of interest to the dataframe
-print('target adducts are {}\n'.format(data.targets[0]))
-data['target'] = [1 if data.adduct[r] in data.targets[0] else 0 for r in range(len(data))]
+target_adducts = [t.lstrip('[').lstrip('"').lstrip("u'").rstrip(",").rstrip(']').rstrip("\'") for t in data.targets[0].split(' ')]
+print('target adducts are {}\n'.format(target_adducts))
+
+data['target'] = [1 if data.adduct[r] in target_adducts else 0 for r in range(len(data))]
 data['above_fdr'] = [1 if data.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(data))]
 data['msm'] = data['chaos'] * data['spatial'] * data['spectral']
 print('there are {} targets and {} decoys. of all the targets, {} are above the 10% FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], data.above_fdr.value_counts()[1]))
@@ -236,7 +238,7 @@ to_save.to_csv(savepath + name + '/data/' +name+'_rescored.csv', index=False)
 importances = final.coef_
 indices = np.argsort(importances[::-1])
 
-feat_imp, ax = plt.subplots(1, 1, figsize=(7, 7))
+feat_imp, ax = plt.subplots(1, 1, figsize=(10, 10))
 ax.set_title("Feature importances")
 ax.bar(range(len(features)), importances[0][indices][0], align="center")
 ax.set_xticks(range(len(features)))
