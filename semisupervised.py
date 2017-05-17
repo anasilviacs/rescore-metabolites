@@ -128,23 +128,43 @@ data['Proteins'] = data['sf']
 # Split by target
 for target in target_adducts:
     data_pos = data[data.target == target]
-    data_neg = #TODO sample 1 decoy adduct for each sf
 
-    data_perc = pd.concat([data_pos, data_neg])
-    data_perc = data[['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']]
-    data_perc.to_csv(...) #TODO good way to name the files for perc to read in.
-    # From Sven:
-    with open("%s" % (args.spec_file + ".target.pin")) as f:
-        row = f.readline()
-        header = row.split('\t')[0:-1]
-        for row in f:
-            l = row.rstrip().split('\t')
-            pin_map[l[0]] = l[0:len(header)]
+    for decoy in range(10):
+        data_neg = #TODO sample 1 decoy adduct for each sf
 
-    # Send to Percolator
-    command = "percolator -U %s > %s.out" % (args.spec_file + ".target.pin", args.spec_file + ".target.pin")
-    os.system(command)
+        data_perc = pd.concat([data_pos, data_neg])
+        data_perc = data[['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']]
+        data_perc.to_csv(...) #TODO good way to name the files for perc to read in.
+        # From Sven:
+        with open("%s" % (args.spec_file + ".target.pin")) as f:
+            row = f.readline()
+            header = row.split('\t')[0:-1]
+            for row in f:
+                l = row.rstrip().split('\t')
+                pin_map[l[0]] = l[0:len(header)]
 
-    # Read results
-    # Aggregate results
-    # Write results
+        # Send to Percolator
+        command = "percolator -U %s > %s.out" % (args.spec_file + ".target.pin", args.spec_file + ".target.pin")
+        os.system(command)
+
+        # Read results
+        # should be a dataframe...
+        fout2 = open(args.spec_file + ".msgfout", "w")
+        with open("%s.out" % (args.spec_file + ".target.pin")) as f:
+            row = f.readline()
+            fout2.write('\t'.join(header) + '\t' + row)
+            for row in f:
+                l = row.rstrip().split('\t')
+                l0 = l[0]
+                tmp = '_'.join(l[0].split('_')[-6:-3])
+                if tmp in id_map:
+                    l[0] = id_map[tmp]
+                    prot = l[5]
+                    if len(l) > 6:
+                        for i in range(6, len(l)):
+                            prot += "|" + l[i]
+                        l[5] = prot
+                        fout2.write('\t'.join(pin_map[l0]) + '\t' + '\t'.join(l[:6]) + '\n')
+
+    # Aggregate results on q-value for each adduct
+    # Write all results
