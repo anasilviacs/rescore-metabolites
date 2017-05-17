@@ -1,20 +1,21 @@
-import time
+# probably won't need all of these
+# import time
 import argparse
-from itertools import compress
-import random
+# from itertools import compress
+# import random
 import os
-import warnings
-import pandas as pd
+# import warnings
+# import pandas as pd
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.preprocessing import StandardScaler
-# from sklearn.grid_search import GridSearchCV
-from sklearn.model_selection import GridSearchCV
-from sklearn.svm import LinearSVC
-from sklearn import metrics
+# import matplotlib
+# matplotlib.use('Agg')
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+# from sklearn.preprocessing import StandardScaler
+# # from sklearn.grid_search import GridSearchCV
+# from sklearn.model_selection import GridSearchCV
+# from sklearn.svm import LinearSVC
+# from sklearn import metrics
 
 warnings.filterwarnings("ignore")
 np.random.seed(42)
@@ -23,6 +24,10 @@ np.random.seed(42)
 This script takes in a csv file which is the export of a sm-engine search done
 with the additional feature extraction. From this output (i.e. annotations),
 we build a linear SVM model which is used to re-score all the annotations.
+This version uses Percolator and treats each target adduct individually, trying
+to reproduce the way the engine does the searches by sampling different sets of
+decoys and optimizing the score for each sampled set. To aggregate all these
+different scores we take the q-values instead of the score itself.
 """
 
 parser = argparse.ArgumentParser(description='Semi-supervised improvement of sm-engine scores')
@@ -111,140 +116,13 @@ features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
 print('using following features:\n')
 print(features)
 
-print('\nsplitting and scaling the data\n')
+# HERE STARTS Percolator
 
-# splitting the data:
-# all the target hits
-data_pos = data[data.target == 1]
-# same number of decoys
-neg_idx = data[data.target == 0].index.values
-np.random.seed(42)
-np.random.shuffle(neg_idx)
-# data_neg = data.loc[neg_idx[:len(data_pos)]]
-# data_out = data.loc[neg_idx[len(data_pos):]]
-# twicethe targets
-data_neg = data.loc[neg_idx[:len(data_pos)*2]]
-data_out = data.loc[neg_idx[len(data_pos)*2:]]
+# Add columns that Percolator needs
 
-# data is now all targets + same number of decoys
-data = pd.concat([data_pos, data_neg])
-
-# identifier columns
-X = data[features + ['sf_name', 'sf', 'adduct', 'target', 'above_fdr']]
-X_out = data_out[features + ['sf_name', 'sf', 'adduct', 'target', 'above_fdr']]
-X_out['target'] = [0] * len(X_out)
-
-# Scaling the data
-scaler = StandardScaler()
-X.loc[:, features] = scaler.fit_transform(X.loc[:, features].values)
-X_out.loc[:, features] = scaler.transform(X_out.loc[:, features].values)
-
-# When selecting the next batch of positive cases we test several FDR values
-# fdrs = np.linspace(0.01, 0.60, num=60)
-fdrs = np.linspace(0.01, 0.30, 30)
-# initial FDR level is 10%
-fdr_level = 0.10
-
-print('starting iterative process:\n')
-for it in range(10):
-    # set cv scheme - to guarantee that there are positive training examples on each fold,
-    # we select a random permutation of all unique sum formulas that are above and below fdr
-    cv_abovefdr = np.random.permutation(data[X.above_fdr == 1].sf.unique())
-    cv_others = np.random.permutation(data[X.above_fdr == 0].sf.unique())
-
-    # for 5 folds in each iteration, we split the sf lists from above in 5.
-    n_af = len(cv_abovefdr)/5
-    n_o = len(cv_others)/5
-    # updating the column "fold"
-    for i in range(5):
-        # 1/5th of the sf which are above the fdr
-        test_sf = cv_abovefdr[i*n_af:(i+1)*n_af]
-        # 1/5th of the sf below fdr
-        test_sf = np.append(test_sf, cv_others[i*n_o:(i+1)*n_o])
-        X.loc[X.sf.isin(test_sf), 'fold'] = i
-
-    for f in range(5):
-        start = time.time()
-
-        # test and train set are defined by the folds
-        # test set is only needed for the model to be applied. y_test is not used
-        data_test = X[X.fold == f]
-        X_test = data_test[features]
-        # y_test = data_test['target']
-
-        data_train = X[X.fold != f]
-        # from the points in this training fold, we select the high confidence
-        # positives + all the negatives
-        X_train = data_train[(data_train.above_fdr == 1) | (data_train.target == 0)][features]
-        y_train = data_train[(data_train.above_fdr == 1) | (data_train.target == 0)]['target']
-        # the ratio of positive to negative labels in the fold
-        log.write("Iteration {}, fold {}: {} neg to {} pos \n".format(it+1, f+1, y_train.value_counts()[0],  y_train.value_counts()[1]))
-
-        # train the model. class_weight is balanced to heavily penalize
-        # misclassifications when we have few examples for a class
-        bst = LinearSVC(class_weight='balanced', random_state=42)
-        bst.fit(X_train, y_train)
-
-        # use this model to re-score the test set
-        X.loc[X.fold == f, 'fold_score'] = bst.decision_function(X_test)
-
-
-    # Selecting positive instances for next fold:
-    # compute FDR for new score
-    threshs = [get_FDR_threshold(X[X.target == 1]['fold_score'], X[X.target == 0]['fold_score'], thr=i) for i in fdrs]
-    nids = [len(X[(X.target == 1) & (X.fold_score > score)]) for score in threshs]
-    nids_threshs = [a > 10 for a in nids]
-
-    # we select the threshold for the minimum of all fdr levels tested that allows for at least 10 identifications
-    # thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
-    nid = list(compress(nids, nids_threshs))[0]
-    thresh = list(compress(threshs, nids_threshs))[0]
-    fdr_level = list(compress(fdrs, nids_threshs))[0]
-    # print(thresh, fdr_level, nid)
-
-    # update X['above_fdr'] in accordance to the new score/fdr level
-    X.loc[:, 'above_fdr'] = [1 if ((X.loc[i, 'fold_score'] > thresh) & X.loc[i, 'target'] == 1) else 0 for i in X.index]
-
-    end = time.time()
-    print("Iteration {} took {}s; {} ids at {} FDR".format(it+1, str(end-start).split('.')[0], nid, fdr_level))
-    log.write("Iteration {} took {}s; {} ids at {} FDR".format(it+1, end-start, nid, fdr_level))
-    print(" -------------------")
-    log.write(" -------------------\n")
-
-
-# Final model
-print('training final model\n')
-X_train = X[(X.above_fdr == 1) | (X.target == 0)][features]
-y_train = X[(X.above_fdr == 1) | (X.target == 0)]['target']
-
-final = LinearSVC(class_weight='balanced', random_state=42)
-final.fit(X_train, y_train)
-
-X_all = pd.concat([X, X_out])
-X_all['target'] = pd.concat([X['target'], X_out.target])
-X_all['final_label'] = [None] * len(X_all)
-
-# final re-scoring of all annotations (including left out decoys)
-X_all['final_score'] = final.decision_function(X_all[features])
-
-print('un-scaling features and saving results\n')
-# De-scaling the features; saving dataframe with results
-to_save = X_all[['sf_name', 'sf', 'adduct', 'target'] + features + ['final_score']]
-to_save[features] = scaler.inverse_transform(to_save[features])
-to_save.to_csv(savepath + name + '/data/' +name+'_rescored.csv', index=False)
-
-
-# Saving feature weights
-importances = final.coef_
-indices = np.argsort(importances[::-1])
-
-feat_imp, ax = plt.subplots(1, 1, figsize=(10, 10))
-ax.set_title("Feature importances")
-ax.bar(range(len(features)), importances[0][indices][0], align="center")
-ax.set_xticks(range(len(features)))
-ax.set_xticklabels([features[i] for i in indices[0]], rotation='vertical')
-ax.set_xlim([-1, len(features)])
-feat_imp.savefig(savepath + name + '/' +name+'_feat_importances.png')
-
-log.close()
-print('finished!')
+# Split by target
+# Sample eq. number of decoys
+# Send to Percolator
+# Read results
+# Aggregate results
+# Write results
