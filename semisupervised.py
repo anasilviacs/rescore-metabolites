@@ -4,8 +4,8 @@ import argparse
 # from itertools import compress
 # import random
 import os
-# import warnings
-# import pandas as pd
+import warnings
+import pandas as pd
 import numpy as np
 # import matplotlib
 # matplotlib.use('Agg')
@@ -118,7 +118,13 @@ print(features)
 
 # HERE STARTS Percolator
 
-# Add columns that Percolator needs
+# Add columns that Percolator needs: ['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']
+data['SpecId'] = data['sf'] + data['adduct']
+data['Label'] = [1 if data.target[r]==1 else -1 for r in range(len(data))]
+data['ScanNr'] = np.arange(len(data))
+data['Peptide'] = ['R.'+sf+'.T' for sf in data['sf']]
+data['Proteins'] = data['sf']
+
 
 # Split by target
 # Sample eq. number of decoys
