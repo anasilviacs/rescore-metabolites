@@ -1,7 +1,7 @@
 # probably won't need all of these
 # import time
 import argparse
-# from itertools import compress
+from itertools import compress
 # import random
 import os
 import warnings
@@ -84,7 +84,9 @@ data = pd.read_csv(args.dataset, sep='\t')
 # Output directories
 savepath = args.dataset.split('/')[0] + '/tests/' + args.dataset.split('/')[-2] + '/'
 if not os.path.exists(savepath + name + '/'):
+    print('creating folders... \n')
     os.makedirs(savepath + name + '/')
+    os.makedirs(savepath + name + '/tmp/')
     os.makedirs(savepath + name + '/data/')
 
 log = open(savepath + name + '/' +name+ '_log.txt', 'w')
@@ -125,30 +127,50 @@ data['ScanNr'] = np.arange(len(data))
 data['Peptide'] = ['R.'+sf+'.T' for sf in data['sf']]
 data['Proteins'] = data['sf']
 
+fdrs = np.linspace(0.01, 0.30, 30)
+print('\n')
 # Split by target
-for target in target_adducts:
-    data_pos = data[data.target == target]
+for target in ['+Na']:
+    data_pos = data[data.adduct == target]
 
-    for decoy in range(10):
-        data_neg = #TODO sample 1 decoy adduct for each sf
-
+    for decoy in range(1):
+        #TODO sample 1 decoy adduct for each sf
+        neg_idx = data[data.target == 0].index.values
+        np.random.seed(42)
+        np.random.shuffle(neg_idx)
+        # data_neg = data.loc[neg_idx[:len(data_pos)]]
+        # data_out = data.loc[neg_idx[len(data_pos):]]
+        # twicethe targets
+        data_neg = data.loc[neg_idx[:len(data_pos)]]
         data_perc = pd.concat([data_pos, data_neg])
-        data_perc = data[['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']]
-        data_perc.to_csv(...) #TODO good way to name the files for perc to read in.
-        # From Sven:
-        with open("%s" % (args.spec_file + ".target.pin")) as f:
-            row = f.readline()
-            header = row.split('\t')[0:-1]
-            for row in f:
-                l = row.rstrip().split('\t')
-                pin_map[l[0]] = l[0:len(header)]
+        print(data_perc.target.value_counts())
+
+        threshs = [get_FDR_threshold(data_perc[data_perc.target == 1]['msm'], data_perc[data_perc.target == 0]['msm'], thr=i) for i in fdrs]
+        nids = [len(data_perc[(data_perc.target == 1) & (data_perc.msm > score)]) for score in threshs]
+        nids_threshs = [a > 10 for a in nids]
+
+        # we select the threshold for the minimum of all fdr levels tested that allows for at least 10 identifications
+        # thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
+        nid = list(compress(nids, nids_threshs))[0]
+        thresh = list(compress(threshs, nids_threshs))[0]
+        fdr_level = list(compress(fdrs, nids_threshs))[0]
+
+
+        data_perc = data_perc[['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']]
+
+        pin_path = os.path.join(savepath, name, "{}_{}.pin".format(target, decoy))
+        pout_path = os.path.join(savepath, name, "{}_{}.pout".format(target, decoy))
+
+        data_perc.to_csv(pin_path, index=False, sep='\t')
 
         # Send to Percolator
-        command = "percolator -U %s > %s.out" % (args.spec_file + ".target.pin", args.spec_file + ".target.pin")
+        # command = "percolator -F {} -U {} > {}".format(fdr_level, pin_path, pout_path)
+        command = "percolator -F 0.25 -U {} > {}".format( pin_path, pout_path)
         os.system(command)
 
         # Read results
-        # should be a dataframe...
+        perc_out = pd.read_csv(pout_path, sep='\t')
+        """
         fout2 = open(args.spec_file + ".msgfout", "w")
         with open("%s.out" % (args.spec_file + ".target.pin")) as f:
             row = f.readline()
@@ -168,3 +190,4 @@ for target in target_adducts:
 
     # Aggregate results on q-value for each adduct
     # Write all results
+"""
