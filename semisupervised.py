@@ -128,26 +128,27 @@ data['Peptide'] = ['R.'+sf+'.T' for sf in data['sf']]
 data['Proteins'] = data['sf']
 
 fdrs = np.linspace(0.01, 0.30, 30)
-print('\n')
+
 # Split by target
-for target in ['+Na']:
+for target in target_adducts:
     data_pos = data[data.adduct == target]
 
     for decoy in range(1):
-        #TODO sample 1 decoy adduct for each sf
+        data_neg = pd.DataFrame(columns=data_pos.columns)
+        for sf in np.unique(data_pos.sf):
+            tmp = data[(data.target == 0) & (data.sf == sf)]
+            data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp)),:])
+        """
         neg_idx = data[data.target == 0].index.values
         np.random.seed(42)
         np.random.shuffle(neg_idx)
-        # data_neg = data.loc[neg_idx[:len(data_pos)]]
-        # data_out = data.loc[neg_idx[len(data_pos):]]
-        # twicethe targets
         data_neg = data.loc[neg_idx[:len(data_pos)]]
+        """
         data_perc = pd.concat([data_pos, data_neg])
-        print(data_perc.target.value_counts())
 
         threshs = [get_FDR_threshold(data_perc[data_perc.target == 1]['msm'], data_perc[data_perc.target == 0]['msm'], thr=i) for i in fdrs]
         nids = [len(data_perc[(data_perc.target == 1) & (data_perc.msm > score)]) for score in threshs]
-        nids_threshs = [a > 10 for a in nids]
+        nids_threshs = [a > 20 for a in nids]
 
         # we select the threshold for the minimum of all fdr levels tested that allows for at least 10 identifications
         # thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
@@ -164,8 +165,7 @@ for target in ['+Na']:
         data_perc.to_csv(pin_path, index=False, sep='\t')
 
         # Send to Percolator
-        # command = "percolator -F {} -U {} > {}".format(fdr_level, pin_path, pout_path)
-        command = "percolator -F 0.25 -U {} > {}".format( pin_path, pout_path)
+        command = "percolator -t {} -F {} -U {} > {}".format(fdr_level, fdr_level, pin_path, pout_path)
         os.system(command)
 
         # Read results
