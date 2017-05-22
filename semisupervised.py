@@ -117,6 +117,7 @@ features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
 
 print('using following features:\n')
 print(features)
+print('\n')
 
 # HERE STARTS Percolator
 
@@ -131,31 +132,30 @@ fdrs = np.linspace(0.01, 0.30, 30)
 
 # Split by target
 for target in target_adducts:
-    print('\nprocessing target adduct {}\n'.format(target))
+    print('processing target adduct {}\n'.format(target))
     data_pos = data[data.adduct == target]
 
-    for decoy in range(1):
-        print('iteration #{}'.format(decoy))
-        data_neg = pd.DataFrame(columns=data_pos.columns)
-        for sf in np.unique(data_pos.sf):
-            tmp = data[(data.target == 0) & (data.sf == sf)]
-            if len(tmp) > 0:
-                data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp)),:])
-            else: continue
+    # build a decoy DataFrame
+    data_neg = pd.DataFrame(columns=data_pos.columns)
+    for sf in np.unique(data_pos.sf):
+        tmp = data[(data.target == 0) & (data.sf == sf)]
+        if len(tmp) > 0:
+            data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp), 10),:])
+        else: continue
 
-        """
-        neg_idx = data[data.target == 0].index.values
-        np.random.seed(42)
-        np.random.shuffle(neg_idx)
-        data_neg = data.loc[neg_idx[:len(data_pos)]]
-        """
-        data_perc = pd.concat([data_pos, data_neg])
+    for decoy in range(10):
+        print('iteration #{}\n'.format(decoy+1))
+
+        data_perc = pd.concat([data_pos, data_neg.iloc[decoy::10,:]])
+        print(data_perc.Label.value_counts())
+
         # data_perc['Label'] = data_perc['Label'].fillna(0)
         data_perc['Label'] = data_perc['Label'].astype(int)
         data_perc['ScanNr'] = data_perc['ScanNr'].astype(int)
 
         # print(data_perc.head())
         # print(data_perc.Label.value_counts())
+
         """
         threshs = [get_FDR_threshold(data_perc[data_perc.target == 1]['msm'], data_perc[data_perc.target == 0]['msm'], thr=i) for i in fdrs]
         nids = [len(data_perc[(data_perc.target == 1) & (data_perc.msm > score)]) for score in threshs]
@@ -167,6 +167,7 @@ for target in target_adducts:
         thresh = list(compress(threshs, nids_threshs))[0]
         fdr_level = list(compress(fdrs, nids_threshs))[0]
         """
+
         threshs = [get_FDR_threshold(data_perc[data_perc.target == 1]['msm'], data_perc[data_perc.target == 0]['msm'], thr=i) for i in fdrs]
         # thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
         # fdr_level = list(compress(fdrs, [t != 999 for t in threshs]))[0]
@@ -184,10 +185,8 @@ for target in target_adducts:
         print('running percolator: {}\n'.format(command))
         os.system(command)
 
-        # Read results
-        print('reading percolator results from {}\n'.format(pout_path))
-        perc_out = pd.read_csv(pout_path, sep='\t')
         """
+
         fout2 = open(args.spec_file + ".msgfout", "w")
         with open("%s.out" % (args.spec_file + ".target.pin")) as f:
             row = f.readline()
