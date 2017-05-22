@@ -110,7 +110,7 @@ features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
         'percentile_40', 'percentile_50', 'percentile_60', 'percentile_70',
         'percentile_80', 'percentile_90', 'quart_1', 'quart_2', 'quart_3',
         'ratio_peak_01', 'ratio_peak_02', 'ratio_peak_03', 'ratio_peak_12',
-        'ratio_peak_13', 'ratio_peak_23', 'snr', 'msm']
+        'ratio_peak_13', 'ratio_peak_23', 'snr', 'msm', 'above_fdr']
 
 # EMBL features:
 # features = ['chaos', 'spatial', 'spectral', 'msm']
@@ -131,13 +131,18 @@ fdrs = np.linspace(0.01, 0.30, 30)
 
 # Split by target
 for target in target_adducts:
+    print('\nprocessing target adduct {}\n'.format(target))
     data_pos = data[data.adduct == target]
 
     for decoy in range(1):
+        print('iteration #{}'.format(decoy))
         data_neg = pd.DataFrame(columns=data_pos.columns)
         for sf in np.unique(data_pos.sf):
             tmp = data[(data.target == 0) & (data.sf == sf)]
-            data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp)),:])
+            if len(tmp) > 0:
+                data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp)),:])
+            else: continue
+
         """
         neg_idx = data[data.target == 0].index.values
         np.random.seed(42)
@@ -145,7 +150,13 @@ for target in target_adducts:
         data_neg = data.loc[neg_idx[:len(data_pos)]]
         """
         data_perc = pd.concat([data_pos, data_neg])
+        # data_perc['Label'] = data_perc['Label'].fillna(0)
+        data_perc['Label'] = data_perc['Label'].astype(int)
+        data_perc['ScanNr'] = data_perc['ScanNr'].astype(int)
 
+        # print(data_perc.head())
+        # print(data_perc.Label.value_counts())
+        """
         threshs = [get_FDR_threshold(data_perc[data_perc.target == 1]['msm'], data_perc[data_perc.target == 0]['msm'], thr=i) for i in fdrs]
         nids = [len(data_perc[(data_perc.target == 1) & (data_perc.msm > score)]) for score in threshs]
         nids_threshs = [a > 20 for a in nids]
@@ -155,7 +166,10 @@ for target in target_adducts:
         nid = list(compress(nids, nids_threshs))[0]
         thresh = list(compress(threshs, nids_threshs))[0]
         fdr_level = list(compress(fdrs, nids_threshs))[0]
-
+        """
+        threshs = [get_FDR_threshold(data_perc[data_perc.target == 1]['msm'], data_perc[data_perc.target == 0]['msm'], thr=i) for i in fdrs]
+        # thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
+        # fdr_level = list(compress(fdrs, [t != 999 for t in threshs]))[0]
 
         data_perc = data_perc[['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']]
 
@@ -165,10 +179,13 @@ for target in target_adducts:
         data_perc.to_csv(pin_path, index=False, sep='\t')
 
         # Send to Percolator
-        command = "percolator -t {} -F {} -U {} > {}".format(fdr_level, fdr_level, pin_path, pout_path)
+        fdr_level = 0.1
+        command = "percolator -v 0 -t {} -F {} -U {} > {}".format(fdr_level, fdr_level, pin_path, pout_path)
+        print('running percolator: {}\n'.format(command))
         os.system(command)
 
         # Read results
+        print('reading percolator results from {}\n'.format(pout_path))
         perc_out = pd.read_csv(pout_path, sep='\t')
         """
         fout2 = open(args.spec_file + ".msgfout", "w")
