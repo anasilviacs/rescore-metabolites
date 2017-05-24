@@ -1,4 +1,4 @@
-sys.stdout.writeimport argparse
+import argparse
 from itertools import compress
 import os
 import sys
@@ -108,8 +108,8 @@ features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
 # features = ['chaos', 'spatial', 'spectral', 'msm']
 
 sys.stdout.write('using following features:\n')
-sys.stdout.write(features)
-sys.stdout.write('\n')
+sys.stdout.write(", ".join(features))
+sys.stdout.write("\n")
 
 # Percolator requires very specific columns:
 data['SpecId'] = data['sf'] + data['adduct']
@@ -144,7 +144,7 @@ for target in target_adducts:
     tmp_dec = pd.DataFrame(index=data_neg.SpecId)
 
     for decoy in range(niter):
-        sys.stdout.write('iteration #{}'.format(decoy+1))
+        sys.stdout.write('iteration #{}\n'.format(decoy+1))
 
         data_perc = pd.concat([data_pos, data_neg.iloc[decoy::niter,:]])
 
@@ -179,9 +179,9 @@ for target in target_adducts:
         # Send to Percolator
         fdr_level = 0.1
         if args.decoys:
-            command = "percolator -v 0 -t {} -F {} -U {} -r {} -B {}".format(fdr_level, fdr_level, pin_path, pout_path, pout_decoys)
+            command = "percolator -v 0 -t {} -F {} -U {} -r {} -B {}\n".format(fdr_level, fdr_level, pin_path, pout_path, pout_decoys)
         else:
-            command = "percolator -v 0 -t {} -F {} -U {} -r {}".format(fdr_level, fdr_level, pin_path, pout_path)
+            command = "percolator -v 0 -t {} -F {} -U {} -r {}\n".format(fdr_level, fdr_level, pin_path, pout_path)
 
         sys.stdout.write('executing: {}'.format(command))
         os.system(command)
@@ -197,6 +197,7 @@ for target in target_adducts:
                 for sf in perc_out.PSMId:
                     tmp_dec.loc[sf, str(decoy)] = perc_out[perc_out.PSMId == sf]['q-value'].values[0]
         else:
+            tmp[str(decoy)] = [None]*len(tmp)
             sys.stdout.write("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
             continue
 
@@ -208,7 +209,7 @@ for target in target_adducts:
     # take average q-value per hit
     tmp[str(niter+1)] = tmp.mean(axis=1)
     if args.decoys: tmp_dec[str(niter+1)] = tmp_dec.mean(axis=1)
-    sys.stdout.write(tmp.head())
+    print(tmp_dec.head())
     sys.stdout.write("#ids at FDR < 10%: {}\n".format(len(tmp[tmp[str(niter+1)] <= 0.1])))
 
     # aggregate results for all adducts
@@ -217,7 +218,7 @@ for target in target_adducts:
 
 ids_end = len(agg_df[agg_df[str(niter+1)] <= 0.1])
 
-sys.stdout.write('final number of identifications at 10% FDR: {} ({}% difference)'.format(ids_end, (1.0*ids_end/ids_init)*100))
+sys.stdout.write('final number of identifications at 10% FDR: {} ({}% difference)\n'.format(ids_end, (1.0*ids_end/ids_init)*100))
 
 # Write out results
 if args.decoys:
