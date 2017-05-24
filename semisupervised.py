@@ -1,21 +1,9 @@
-# probably won't need all of these
-# import time
 import argparse
 from itertools import compress
-# import random
 import os
 import warnings
 import pandas as pd
 import numpy as np
-# import matplotlib
-# matplotlib.use('Agg')
-# import matplotlib.pyplot as plt
-# import seaborn as sns
-# from sklearn.preprocessing import StandardScaler
-# # from sklearn.grid_search import GridSearchCV
-# from sklearn.model_selection import GridSearchCV
-# from sklearn.svm import LinearSVC
-# from sklearn import metrics
 
 warnings.filterwarnings("ignore")
 np.random.seed(42)
@@ -140,7 +128,6 @@ agg_df = pd.DataFrame()
 if args.decoys: decoy_df = pd.DataFrame()
 # Split by target
 for target in target_adducts:
-# for target in ['+H']:
     print('processing target adduct {}. initial #ids at 10% FDR: {}\n'.format(target,np.sum(data[data.adduct == target].above_fdr)))
     data_pos = data[data.adduct == target]
 
@@ -160,12 +147,8 @@ for target in target_adducts:
         data_perc = pd.concat([data_pos, data_neg.iloc[decoy::niter,:]])
         tmp_dec = pd.DataFrame(index=data_neg.iloc[decoy::niter,:].SpecId)
 
-        # data_perc['Label'] = data_perc['Label'].fillna(0)
         data_perc['Label'] = data_perc['Label'].astype(int)
         data_perc['ScanNr'] = data_perc['ScanNr'].astype(int)
-
-        # print(data_perc.head())
-        # print(data_perc.Label.value_counts())
 
         """
         threshs = [get_FDR_threshold(data_perc[data_perc.target == 1]['msm'], data_perc[data_perc.target == 0]['msm'], thr=i) for i in fdrs]
@@ -177,11 +160,12 @@ for target in target_adducts:
         nid = list(compress(nids, nids_threshs))[0]
         thresh = list(compress(threshs, nids_threshs))[0]
         fdr_level = list(compress(fdrs, nids_threshs))[0]
-        """
+
 
         #threshs = [get_FDR_threshold(data_perc[data_perc.target == 1]['msm'], data_perc[data_perc.target == 0]['msm'], thr=i) for i in fdrs]
         #thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
         #fdr_level = list(compress(fdrs, [t != 999 for t in threshs]))[0]
+        """
 
         data_perc = data_perc[['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']]
 
@@ -204,9 +188,7 @@ for target in target_adducts:
         # Check if Percolator was able to run
         if os.path.isfile(pout_path):
             # Read results
-            # print('reading percolator results from {}'.format(pout_path))
             perc_out = pd.read_csv(pout_path, sep='\t')
-            # print("#ids at FDR < 10%: {}\n".format(len(perc_out[perc_out['q-value'] <= 0.1])))
             tmp[str(decoy)] = [perc_out[perc_out.PSMId == sf]['q-value'].values[0] for sf in tmp.index]
             if args.decoys:
                 perc_out = pd.read_csv(pout_decoys, sep='\t')
@@ -221,11 +203,12 @@ for target in target_adducts:
             if args.decoys: os.remove(pout_decoys)
         else: continue
 
-        # take average q-value per target hit
+        # take average q-value per hit
         tmp[str(niter+1)] = tmp.mean(axis=1)
         if args.decoys: tmp_dec[str(niter+1)] = tmp_dec.mean(axis=1)
         print("#ids at FDR < 10%: {}\n".format(len(tmp[tmp[str(niter+1)] <= 0.1])))
-    # combine aggregated results for all target adducts
+
+    # aggregate results for all adducts
     agg_df = pd.concat([agg_df, tmp])
     if args.decoys: decoy_df = pd.concat([decoy_df, tmp_dec])
 
