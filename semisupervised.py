@@ -122,7 +122,7 @@ else: print('intermediate files will be deleted\n')
 if args.decoys: print("attention! saving decoys' q-values\n")
 
 # fdrs = np.linspace(0.01, 0.30, 30)
-niter = 2
+niter = 3
 
 agg_df = pd.DataFrame()
 if args.decoys: decoy_df = pd.DataFrame()
@@ -140,12 +140,12 @@ for target in target_adducts:
         else: continue
 
     tmp = pd.DataFrame(index=data_pos.SpecId)
+    tmp_dec = pd.DataFrame(index=data_neg.SpecId)
 
     for decoy in range(niter):
         print('iteration #{}'.format(decoy+1))
 
         data_perc = pd.concat([data_pos, data_neg.iloc[decoy::niter,:]])
-        tmp_dec = pd.DataFrame(index=data_neg.iloc[decoy::niter,:].SpecId)
 
         data_perc['Label'] = data_perc['Label'].astype(int)
         data_perc['ScanNr'] = data_perc['ScanNr'].astype(int)
@@ -192,7 +192,9 @@ for target in target_adducts:
             tmp[str(decoy)] = [perc_out[perc_out.PSMId == sf]['q-value'].values[0] for sf in tmp.index]
             if args.decoys:
                 perc_out = pd.read_csv(pout_decoys, sep='\t')
-                tmp_dec[str(decoy)] = [perc_out[perc_out.PSMId == sf]['q-value'].values[0] for sf in tmp_dec.index]
+                tmp_dec[str(decoy)] = [None]*len(tmp_dec)
+                for sf in perc_out.PSMId:
+                    tmp_dec.loc[sf, str(decoy)] = perc_out[perc_out.PSMId == sf]['q-value'].values[0]
         else:
             print("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
             continue
@@ -203,10 +205,11 @@ for target in target_adducts:
             if args.decoys: os.remove(pout_decoys)
         else: continue
 
-        # take average q-value per hit
-        tmp[str(niter+1)] = tmp.mean(axis=1)
-        if args.decoys: tmp_dec[str(niter+1)] = tmp_dec.mean(axis=1)
-        print("#ids at FDR < 10%: {}\n".format(len(tmp[tmp[str(niter+1)] <= 0.1])))
+    # take average q-value per hit
+    tmp[str(niter+1)] = tmp.mean(axis=1)
+    if args.decoys: tmp_dec[str(niter+1)] = tmp_dec.mean(axis=1)
+    print(tmp.head())
+    print("#ids at FDR < 10%: {}\n".format(len(tmp[tmp[str(niter+1)] <= 0.1])))
 
     # aggregate results for all adducts
     agg_df = pd.concat([agg_df, tmp])
