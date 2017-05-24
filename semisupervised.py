@@ -100,7 +100,8 @@ print('target adducts are {}\n'.format(target_adducts))
 data['target'] = [1 if data.adduct[r] in target_adducts else 0 for r in range(len(data))]
 data['above_fdr'] = [1 if data.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(data))]
 data['msm'] = data['chaos'] * data['spatial'] * data['spectral']
-print('there are {} targets and {} decoys. of all the targets, {} are above the 10% FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], data.above_fdr.value_counts()[1]))
+ids_init = data.above_fdr.value_counts()[1]
+print('there are {} targets and {} decoys. of all the targets, {} are above the 10% FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], ids_init))
 
 # List with all the features used to build the model
 features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
@@ -128,11 +129,14 @@ data['ScanNr'] = np.arange(len(data))
 data['Peptide'] = ['R.'+sf+'.T' for sf in data['sf']]
 data['Proteins'] = data['sf']
 
-fdrs = np.linspace(0.01, 0.30, 30)
+# fdrs = np.linspace(0.01, 0.30, 30)
+niter = 10
 
+agg_df = pd.DataFrame()
 # Split by target
 for target in target_adducts:
-    print('processing target adduct {}. initial #ids at 10% FDR: {}\n'.format(target, np.sum(data[data.adduct == target].above_fdr)))
+# for target in ['+H']:
+    print('processing target adduct {}. initial #ids at 10% FDR: {}\n'.format(target,np.sum(data[data.adduct == target].above_fdr)))
     data_pos = data[data.adduct == target]
 
     # build a decoy DataFrame
@@ -140,13 +144,15 @@ for target in target_adducts:
     for sf in np.unique(data_pos.sf):
         tmp = data[(data.target == 0) & (data.sf == sf)]
         if len(tmp) > 0:
-            data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp), 10),:])
+            data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp), niter),:])
         else: continue
-    
-    for decoy in range(10):
+
+    tmp = pd.DataFrame(index=data_pos.SpecId)
+
+    for decoy in range(niter):
         print('iteration #{}'.format(decoy+1))
 
-        data_perc = pd.concat([data_pos, data_neg.iloc[decoy::10,:]])
+        data_perc = pd.concat([data_pos, data_neg.iloc[decoy::niter,:]])
 
         # data_perc['Label'] = data_perc['Label'].fillna(0)
         data_perc['Label'] = data_perc['Label'].astype(int)
@@ -187,33 +193,27 @@ for target in target_adducts:
         # Check if Percolator was able to run
         if os.path.isfile(pout_path):
             # Read results
-            print('reading percolator results from {}'.format(pout_path))
+            # print('reading percolator results from {}'.format(pout_path))
             perc_out = pd.read_csv(pout_path, sep='\t')
-            print("#ids at FDR < 10%: {}\n".format(len(perc_out[perc_out['q-value'] <= 0.1])))
+            # print("#ids at FDR < 10%: {}\n".format(len(perc_out[perc_out['q-value'] <= 0.1])))
+            tmp[str(decoy)] = [perc_out[perc_out.PSMId == sf]['q-value'].values[0] for sf in tmp.index]
 
         else:
             print("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
             continue
 
-        """
+        # take average q-value per target hit
+        tmp[str(niter+1)] = tmp.mean(axis=1)
+        print("#ids at FDR < 10%: {}\n".format(len(tmp[tmp[str(niter+1)] <= 0.1])))
+    # combine aggregated results for all target adducts
+    agg_df = pd.concat([agg_df, tmp])
 
-        fout2 = open(args.spec_file + ".msgfout", "w")
-        with open("%s.out" % (args.spec_file + ".target.pin")) as f:
-            row = f.readline()
-            fout2.write('\t'.join(header) + '\t' + row)
-            for row in f:
-                l = row.rstrip().split('\t')
-                l0 = l[0]
-                tmp = '_'.join(l[0].split('_')[-6:-3])
-                if tmp in id_map:
-                    l[0] = id_map[tmp]
-                    prot = l[5]
-                    if len(l) > 6:
-                        for i in range(6, len(l)):
-                            prot += "|" + l[i]
-                        l[5] = prot
-                        fout2.write('\t'.join(pin_map[l0]) + '\t' + '\t'.join(l[:6]) + '\n')
+# agg_df.set_index('SpecId', inplace=True)
 
-    # Aggregate results on q-value for each adduct
-    # Write all results
-"""
+ids_end = len(agg_df[agg_df[str(niter+1)] <= 0.1])
+
+print('final number of identifications at 10% FDR: {} ({}% difference)'.format(ids_end, (1.0*ids_end/ids_init)*100))
+
+# Write out results
+# agg_df['10'].to_csv(savepath + 'results.csv', index=True)
+agg_df.to_csv(savepath + 'results.csv', index=True)
