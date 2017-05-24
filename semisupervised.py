@@ -30,12 +30,10 @@ decoys and optimizing the score for each sampled set. To aggregate all these
 different scores we take the q-values instead of the score itself.
 """
 
-#TODO remove intermediate files (make optional?)
-#TODO get decoy scores from Percolator (make optional?)
-
 parser = argparse.ArgumentParser(description='Semi-supervised improvement of sm-engine scores')
 parser.add_argument('dataset', type=str, help='path to dataset')
 parser.add_argument('-k', dest='keep', help='keep intermediate files (default FALSE)', action='store_true', default=False)
+parser.add_argument('-d', dest='decoys', help='return decoy q-values (default FALSE)', action='store_true', default=False)
 
 args = parser.parse_args()
 
@@ -133,11 +131,13 @@ data['Proteins'] = data['sf']
 
 if args.keep: print('attention! will keep all intermediate files\n')
 else: print('intermediate files will be deleted\n')
+if args.decoys: print("attention! saving decoys' q-values\n")
 
 # fdrs = np.linspace(0.01, 0.30, 30)
-niter = 10
+niter = 2
 
 agg_df = pd.DataFrame()
+if args.decoys: decoy_df = pd.DataFrame()
 # Split by target
 for target in target_adducts:
 # for target in ['+H']:
@@ -158,6 +158,7 @@ for target in target_adducts:
         print('iteration #{}'.format(decoy+1))
 
         data_perc = pd.concat([data_pos, data_neg.iloc[decoy::niter,:]])
+        tmp_dec = pd.DataFrame(index=data_neg.iloc[decoy::niter,:].SpecId)
 
         # data_perc['Label'] = data_perc['Label'].fillna(0)
         data_perc['Label'] = data_perc['Label'].astype(int)
@@ -186,12 +187,17 @@ for target in target_adducts:
 
         pin_path = os.path.join(savepath, name, "{}_{}.pin".format(target, decoy))
         pout_path = os.path.join(savepath, name, "{}_{}.pout".format(target, decoy))
+        if args.decoys: pout_decoys = os.path.join(savepath, name, "{}_{}_decoys.pout".format(target, decoy))
+        else: continue
 
         data_perc.to_csv(pin_path, index=False, sep='\t')
 
         # Send to Percolator
         fdr_level = 0.1
-        command = "percolator -v 0 -t {} -F {} -U {} -r {}".format(fdr_level, fdr_level, pin_path, pout_path)
+        if args.decoys:
+            command = "percolator -v 0 -t {} -F {} -U {} -r {} -B {}".format(fdr_level, fdr_level, pin_path, pout_path, pout_decoys)
+        else:
+            command = "percolator -v 0 -t {} -F {} -U {} -r {}".format(fdr_level, fdr_level, pin_path, pout_path)
         print('executing: {}'.format(command))
         os.system(command)
 
@@ -202,7 +208,9 @@ for target in target_adducts:
             perc_out = pd.read_csv(pout_path, sep='\t')
             # print("#ids at FDR < 10%: {}\n".format(len(perc_out[perc_out['q-value'] <= 0.1])))
             tmp[str(decoy)] = [perc_out[perc_out.PSMId == sf]['q-value'].values[0] for sf in tmp.index]
-
+            if args.decoys:
+                perc_out = pd.read_csv(pout_decoys, sep='\t')
+                tmp_dec[str(decoy)] = [perc_out[perc_out.PSMId == sf]['q-value'].values[0] for sf in tmp_dec.index]
         else:
             print("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
             continue
@@ -210,20 +218,23 @@ for target in target_adducts:
         if not args.keep:
             os.remove(pin_path)
             os.remove(pout_path)
+            if args.decoys: os.remove(pout_decoys)
         else: continue
 
         # take average q-value per target hit
         tmp[str(niter+1)] = tmp.mean(axis=1)
+        if args.decoys: tmp_dec[str(niter+1)] = tmp_dec.mean(axis=1)
         print("#ids at FDR < 10%: {}\n".format(len(tmp[tmp[str(niter+1)] <= 0.1])))
     # combine aggregated results for all target adducts
     agg_df = pd.concat([agg_df, tmp])
-
-# agg_df.set_index('SpecId', inplace=True)
+    if args.decoys: decoy_df = pd.concat([decoy_df, tmp_dec])
 
 ids_end = len(agg_df[agg_df[str(niter+1)] <= 0.1])
 
 print('final number of identifications at 10% FDR: {} ({}% difference)'.format(ids_end, (1.0*ids_end/ids_init)*100))
 
 # Write out results
-# agg_df['10'].to_csv(savepath + 'results.csv', index=True)
-agg_df.to_csv(savepath + 'results.csv', index=True)
+if args.decoys:
+    agg_df = pd.concat([agg_df, decoy_df])
+
+agg_df.to_csv(savepath + name +'/results.csv', index=True)
