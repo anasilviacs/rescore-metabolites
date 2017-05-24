@@ -30,8 +30,12 @@ decoys and optimizing the score for each sampled set. To aggregate all these
 different scores we take the q-values instead of the score itself.
 """
 
+#TODO remove intermediate files (make optional?)
+#TODO get decoy scores from Percolator (make optional?)
+
 parser = argparse.ArgumentParser(description='Semi-supervised improvement of sm-engine scores')
 parser.add_argument('dataset', type=str, help='path to dataset')
+parser.add_argument('-k', dest='keep', help='keep intermediate files (default FALSE)', action='store_true', default=False)
 
 args = parser.parse_args()
 
@@ -120,14 +124,15 @@ print('using following features:\n')
 print(features)
 print('\n')
 
-# HERE STARTS Percolator
-
-# Add columns that Percolator needs: ['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']
+# Percolator requires very specific columns:
 data['SpecId'] = data['sf'] + data['adduct']
 data['Label'] = [1 if data.target[r]==1 else -1 for r in range(len(data))]
 data['ScanNr'] = np.arange(len(data))
 data['Peptide'] = ['R.'+sf+'.T' for sf in data['sf']]
 data['Proteins'] = data['sf']
+
+if args.keep: print('attention! will keep all intermediate files\n')
+else: print('intermediate files will be deleted\n')
 
 # fdrs = np.linspace(0.01, 0.30, 30)
 niter = 10
@@ -187,7 +192,7 @@ for target in target_adducts:
         # Send to Percolator
         fdr_level = 0.1
         command = "percolator -v 0 -t {} -F {} -U {} -r {}".format(fdr_level, fdr_level, pin_path, pout_path)
-        print('running percolator: {}'.format(command))
+        print('executing: {}'.format(command))
         os.system(command)
 
         # Check if Percolator was able to run
@@ -201,6 +206,11 @@ for target in target_adducts:
         else:
             print("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
             continue
+
+        if not args.keep:
+            os.remove(pin_path)
+            os.remove(pout_path)
+        else: continue
 
         # take average q-value per target hit
         tmp[str(niter+1)] = tmp.mean(axis=1)
