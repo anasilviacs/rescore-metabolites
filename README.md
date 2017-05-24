@@ -2,7 +2,9 @@
 
 Take annotations obtained from the METASPACE spatial metabolomics annotation engine and use a semi-supervised method to re-score them.
 
-...
+This is achieved by taking the most confident target hits along with the decoy hits and training a classifier. This classifier is then used to re-score all of the annotations.
+
+This version uses the sklearn `LinearSVC` implementation and repeats this process for a defined number of iterations.
 
 ### install
 
