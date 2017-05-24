@@ -123,7 +123,7 @@ else: sys.stdout.write('intermediate files will be deleted\n')
 if args.decoys: sys.stdout.write("attention! saving decoys' q-values\n")
 
 # fdrs = np.linspace(0.01, 0.30, 30)
-niter = 3
+niter = 10
 
 agg_df = pd.DataFrame()
 if args.decoys: decoy_df = pd.DataFrame()
@@ -197,8 +197,8 @@ for target in target_adducts:
                 for sf in perc_out.PSMId:
                     tmp_dec.loc[sf, str(decoy)] = perc_out[perc_out.PSMId == sf]['q-value'].values[0]
         else:
-            tmp[str(decoy)] = [None]*len(tmp)
             sys.stdout.write("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
+            tmp[str(decoy)] = [None]*len(tmp) # unnecessary, i think
             continue
 
         if not args.keep:
@@ -207,16 +207,15 @@ for target in target_adducts:
             if args.decoys: os.remove(pout_decoys)
 
     # take average q-value per hit
-    tmp[str(niter+1)] = tmp.mean(axis=1)
-    if args.decoys: tmp_dec[str(niter+1)] = tmp_dec.mean(axis=1)
-    print(tmp_dec.head())
-    sys.stdout.write("#ids at FDR < 10%: {}\n".format(len(tmp[tmp[str(niter+1)] <= 0.1])))
+    tmp['combined'] = tmp.mean(axis=1)
+    if args.decoys: tmp_dec['combined'] = tmp_dec.mean(axis=1)
+    sys.stdout.write("#ids at FDR < 10%: {}\n".format(len(tmp[tmp['combined'] <= 0.1])))
 
     # aggregate results for all adducts
     agg_df = pd.concat([agg_df, tmp])
     if args.decoys: decoy_df = pd.concat([decoy_df, tmp_dec])
 
-ids_end = len(agg_df[agg_df[str(niter+1)] <= 0.1])
+ids_end = len(agg_df[agg_df['combined'] <= 0.1])
 
 sys.stdout.write('final number of identifications at 10% FDR: {} ({}% difference)\n'.format(ids_end, (1.0*ids_end/ids_init)*100))
 
