@@ -1,6 +1,7 @@
-import argparse
+sys.stdout.writeimport argparse
 from itertools import compress
 import os
+import sys
 import warnings
 import pandas as pd
 import numpy as np
@@ -25,7 +26,7 @@ parser.add_argument('-d', dest='decoys', help='return decoy q-values (default FA
 
 args = parser.parse_args()
 
-print("\n*ReSCORE METASPACE*\n")
+sys.stdout.write("\n*ReSCORE METASPACE*\n")
 
 def get_FDR_threshold(pos, neg, thr=0.10):
     """
@@ -53,9 +54,9 @@ def get_FDR_threshold(pos, neg, thr=0.10):
             break
         d = (1.0 * len_neg-c_neg)/len_neg
         t = (1.0 * len_pos-c_pos)/len_pos
-        # print len_pos, c_pos, t
+        # sys.stdout.write len_pos, c_pos, t
         fdr = d/t
-        # print(fdr, c_pos, c_neg)
+        # sys.stdout.write(fdr, c_pos, c_neg)
         if fdr < thr:
             return spos[c_pos]
         if spos[c_pos] < sneg[c_neg]:
@@ -67,31 +68,31 @@ def get_FDR_threshold(pos, neg, thr=0.10):
     return 999
 
 # Loading data
-print('loading data...\n')
+sys.stdout.write('loading data...\n')
 name = args.dataset.split('/')[-1].rstrip('.csv')
 data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directories
 savepath = args.dataset.split('/')[0] + '/tests/' + args.dataset.split('/')[-2] + '/'
 if not os.path.exists(savepath + name + '/'):
-    print('creating folders... \n')
+    sys.stdout.write('creating folders... \n')
     os.makedirs(savepath + name + '/')
     os.makedirs(savepath + name + '/tmp/')
     os.makedirs(savepath + name + '/data/')
 
 log = open(savepath + name + '/' +name+ '_log.txt', 'w')
 
-print('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
+sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
 
 # Adding columns of interest to the dataframe
 target_adducts = [t.lstrip('[').lstrip('"').lstrip("u'").rstrip(",").rstrip(']').rstrip("\'") for t in data.targets[0].split(' ')]
-print('target adducts are {}\n'.format(target_adducts))
+sys.stdout.write('target adducts are {}\n'.format(target_adducts))
 
 data['target'] = [1 if data.adduct[r] in target_adducts else 0 for r in range(len(data))]
 data['above_fdr'] = [1 if data.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(data))]
 data['msm'] = data['chaos'] * data['spatial'] * data['spectral']
 ids_init = data.above_fdr.value_counts()[1]
-print('there are {} targets and {} decoys. of all the targets, {} are above the 10% FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], ids_init))
+sys.stdout.write('there are {} targets and {} decoys. of all the targets, {} are above the 10% FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], ids_init))
 
 # List with all the features used to build the model
 features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
@@ -106,9 +107,9 @@ features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
 # EMBL features:
 # features = ['chaos', 'spatial', 'spectral', 'msm']
 
-print('using following features:\n')
-print(features)
-print('\n')
+sys.stdout.write('using following features:\n')
+sys.stdout.write(features)
+sys.stdout.write('\n')
 
 # Percolator requires very specific columns:
 data['SpecId'] = data['sf'] + data['adduct']
@@ -117,9 +118,9 @@ data['ScanNr'] = np.arange(len(data))
 data['Peptide'] = ['R.'+sf+'.T' for sf in data['sf']]
 data['Proteins'] = data['sf']
 
-if args.keep: print('attention! will keep all intermediate files\n')
-else: print('intermediate files will be deleted\n')
-if args.decoys: print("attention! saving decoys' q-values\n")
+if args.keep: sys.stdout.write('attention! will keep all intermediate files\n')
+else: sys.stdout.write('intermediate files will be deleted\n')
+if args.decoys: sys.stdout.write("attention! saving decoys' q-values\n")
 
 # fdrs = np.linspace(0.01, 0.30, 30)
 niter = 3
@@ -128,7 +129,7 @@ agg_df = pd.DataFrame()
 if args.decoys: decoy_df = pd.DataFrame()
 # Split by target
 for target in target_adducts:
-    print('processing target adduct {}. initial #ids at 10% FDR: {}\n'.format(target,np.sum(data[data.adduct == target].above_fdr)))
+    sys.stdout.write('processing target adduct {}. initial #ids at 10% FDR: {}\n'.format(target,np.sum(data[data.adduct == target].above_fdr)))
     data_pos = data[data.adduct == target]
 
     # build a decoy DataFrame
@@ -143,7 +144,7 @@ for target in target_adducts:
     tmp_dec = pd.DataFrame(index=data_neg.SpecId)
 
     for decoy in range(niter):
-        print('iteration #{}'.format(decoy+1))
+        sys.stdout.write('iteration #{}'.format(decoy+1))
 
         data_perc = pd.concat([data_pos, data_neg.iloc[decoy::niter,:]])
 
@@ -172,7 +173,6 @@ for target in target_adducts:
         pin_path = os.path.join(savepath, name, "{}_{}.pin".format(target, decoy))
         pout_path = os.path.join(savepath, name, "{}_{}.pout".format(target, decoy))
         if args.decoys: pout_decoys = os.path.join(savepath, name, "{}_{}_decoys.pout".format(target, decoy))
-        else: continue
 
         data_perc.to_csv(pin_path, index=False, sep='\t')
 
@@ -182,7 +182,8 @@ for target in target_adducts:
             command = "percolator -v 0 -t {} -F {} -U {} -r {} -B {}".format(fdr_level, fdr_level, pin_path, pout_path, pout_decoys)
         else:
             command = "percolator -v 0 -t {} -F {} -U {} -r {}".format(fdr_level, fdr_level, pin_path, pout_path)
-        print('executing: {}'.format(command))
+
+        sys.stdout.write('executing: {}'.format(command))
         os.system(command)
 
         # Check if Percolator was able to run
@@ -196,20 +197,19 @@ for target in target_adducts:
                 for sf in perc_out.PSMId:
                     tmp_dec.loc[sf, str(decoy)] = perc_out[perc_out.PSMId == sf]['q-value'].values[0]
         else:
-            print("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
+            sys.stdout.write("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
             continue
 
         if not args.keep:
             os.remove(pin_path)
             os.remove(pout_path)
             if args.decoys: os.remove(pout_decoys)
-        else: continue
 
     # take average q-value per hit
     tmp[str(niter+1)] = tmp.mean(axis=1)
     if args.decoys: tmp_dec[str(niter+1)] = tmp_dec.mean(axis=1)
-    print(tmp.head())
-    print("#ids at FDR < 10%: {}\n".format(len(tmp[tmp[str(niter+1)] <= 0.1])))
+    sys.stdout.write(tmp.head())
+    sys.stdout.write("#ids at FDR < 10%: {}\n".format(len(tmp[tmp[str(niter+1)] <= 0.1])))
 
     # aggregate results for all adducts
     agg_df = pd.concat([agg_df, tmp])
@@ -217,7 +217,7 @@ for target in target_adducts:
 
 ids_end = len(agg_df[agg_df[str(niter+1)] <= 0.1])
 
-print('final number of identifications at 10% FDR: {} ({}% difference)'.format(ids_end, (1.0*ids_end/ids_init)*100))
+sys.stdout.write('final number of identifications at 10% FDR: {} ({}% difference)'.format(ids_end, (1.0*ids_end/ids_init)*100))
 
 # Write out results
 if args.decoys:
