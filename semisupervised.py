@@ -206,8 +206,8 @@ for target in target_adducts:
             os.remove(pout_path)
             if args.decoys: os.remove(pout_decoys)
 
-    # take average q-value per hit
-    tmp['combined'] = tmp.mean(axis=1)
+    # take median q-value per hit
+    tmp['combined'] = tmp.median(axis=1)
     if args.decoys: tmp_dec['combined'] = tmp_dec.mean(axis=1)
     sys.stdout.write("#ids at FDR < 10%: {}\n".format(len(tmp[tmp['combined'] <= 0.1])))
 
