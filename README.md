@@ -31,9 +31,10 @@ With the exported file, run `semisupervised.py`:
 
 ```
 python semisupervised.py [path to csv file] [-d] [-k]
+
  "path to csv file" is where the exported csv file is
  "-d" is a flag which should be used for getting the decoys' q-values
  "-k" is a flag which should be used to keep the intermediate files
 ```
 
-This version of the re-scoring method saves a `csv` with the q-values for each hit over 10 iterations plus the average. There is a possibility to also save the decoy hits' q-values, although give the nature of the sampling process it is unlikely that all of them will have values.
+This version of the re-scoring method saves a `csv` with the q-values for each hit over 10 iterations plus the median. There is a possibility to also save the decoy hits' q-values, although give the nature of the sampling process it is unlikely that all of them will have values.
