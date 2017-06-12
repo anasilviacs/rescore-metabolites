@@ -165,12 +165,12 @@ sys.stdout.write("Saving Venn diagram for annotations\n")
 
 # Split by target adduct
 f, ax = plt.subplots(1,3, figsize=(15,5))
+f.suptitle('Overlap in annotations per target adduct', fontsize=14)
 
-f.suptitle('Overlap in annotations per target adduct: Local and Remote METASPACE engine', fontsize=14)
+resc['adduct'] = ['+' + r.SpecId.split('+')[1] for _,r in resc.iterrows()]
 for i, t in enumerate(target_adducts):
     local_ids = set(orig[(orig.above_fdr == 1) & (orig.adduct == t)].sf_add)
-
-    rescore_id = set(rescored[(rescored.adduct == t) & (rescored.final_score > thresh)].sf_add)
+    rescore_id = set(resc[(resc.adduct == t) & (resc.combined <= 0.10)].SpecId)
 
     s = (
         len(local_ids.difference(rescore_id)),    # Ab
@@ -180,9 +180,8 @@ for i, t in enumerate(target_adducts):
 
     v = venn2(subsets=s, set_labels=('engine '+t, 'rescored'+t), ax=ax[i])
 
-plt.savefig(name + '_annotationoverlapperadduct.png')
+plt.savefig(name + '_annotationoverlappertarget.png')
 sys.stdout.write("Saving Venn diagram for annotations split by adduct\n")
-kkk
 
 # number of ids at different FDR levels
 def std_dev_median(values):
@@ -191,7 +190,7 @@ def std_dev_median(values):
 fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot(1,1,1)
 
-rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:])
+rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:-1])
 
 for r in rescored_nids.iterrows():
     fdr = r[0]
@@ -206,7 +205,7 @@ dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]]
 bars = ax.bar(np.arange(len(fdrs)), nids, yerr=dev_med, ecolor='crimson', tick_label=fdrs, align='center')
 
 ax.set_ylabel('# ids')
-ax.set_ylim([0, np.max(nids)+500])
+ax.set_ylim([0, np.max(nids)*1.2])
 ax.set_xlabel('FDR')
 
 def autolabel(rects, dev_med):
@@ -221,7 +220,9 @@ def autolabel(rects, dev_med):
 
 autolabel(bars, dev_med)
 
-plt.title("number of identifications at different FDR thresholds")
+ax.set_title("Number of identifications at different FDR thresholds")
+plt.savefig(name + '_nids.png')
+sys.stdout.write("Saving barplot with number of identifications at different FDRs\n")
 
 # Split by target adduct
 fig = plt.figure(figsize=(20,5))
@@ -267,3 +268,5 @@ ax.set_xticklabels(fdrs)
 ax.set_xlabel('FDR')
 
 ax.set_title('Number of identifications per target adduct at different FDRs', fontsize=14)
+plt.savefig(name + '_nidspertarget.png')
+sys.stdout.write("Saving barplot with number of identifications at different FDRs split by adduct\n")
