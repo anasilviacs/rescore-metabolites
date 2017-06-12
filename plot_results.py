@@ -167,7 +167,7 @@ sys.stdout.write("Saving Venn diagram for annotations\n")
 f, ax = plt.subplots(1,3, figsize=(15,5))
 f.suptitle('Overlap in annotations per target adduct', fontsize=14)
 
-resc['adduct'] = ['+' + r.SpecId.split('+')[1] for _,r in resc.iterrows()]
+resc['adduct'] = ['+'+r.SpecId.split('+')[1] if '+' in r.SpecId else '-'+r.SpecId.split('-')[1] for _,r in resc.iterrows()]
 for i, t in enumerate(target_adducts):
     local_ids = set(orig[(orig.above_fdr == 1) & (orig.adduct == t)].sf_add)
     rescore_id = set(resc[(resc.adduct == t) & (resc.combined <= 0.10)].SpecId)
