@@ -1,39 +1,41 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.cm as mplcm
-import matplotlib.colors as colors
-%matplotlib inline
 from matplotlib_venn import venn2, venn3
 from collections import Counter
 import seaborn as sns
 import os
 
 #TODO un-hard-code files, replace prints with stdout
-#TODO set arguments
 
-# Load engine results
-engine_local = pd.read_csv('adrenal_gland.csv', sep='\t')
+parser = argparse.ArgumentParser(description='Semi-supervised improvement of sm-engine scores')
+parser.add_argument('orig', type=str, help='path to original search results')
+parser.add_argument('resc', type=str, help='path to rescored results')
+
+sys.stdout.write("\nPlotting rescored results\n")
+
+args = parser.parse_args()
+name = args.orig.split('/')[-1].rstrip('.csv')
+
+sys.stdout.write("Loading original search results\n")
+orig = pd.read_csv(args.orig, sep='\t')
 
 target_adducts = [t.lstrip('[').lstrip('"').lstrip("u'").rstrip(",").rstrip(']').rstrip("\'")
-                  for t in engine_local.targets[0].split(' ')]
+                  for t in orig.targets[0].split(' ')]
 
-print('target adducts are {}\n'.format(target_adducts))
-
-engine_local['sf_add'] = engine_local['sf'] + engine_local['adduct']
-engine_local['target'] = [1 if engine_local.adduct[r] in target_adducts else 0 for r in range(len(engine_local))]
-engine_local['above_fdr'] = [1 if engine_local.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(engine_local))]
-engine_local['target_adduct'] = [r.adduct if r.target == 1 else 'decoy' for _, r in engine_local.iterrows()]
-engine_local['msm'] = engine_local['spatial'] * engine_local['spectral'] * engine_local['chaos']
-
-print(engine_local.above_fdr.value_counts())
+orig['sf_add'] = orig['sf'] + orig['adduct']
+orig['target'] = [1 if orig.adduct[r] in target_adducts else 0 for r in range(len(orig))]
+orig['above_fdr'] = [1 if orig.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(orig))]
+orig['target_adduct'] = [r.adduct if r.target == 1 else 'decoy' for _, r in orig.iterrows()]
+orig['msm'] = orig['spatial'] * orig['spectral'] * orig['chaos']
 
 # MSM score distribution
-g = sns.FacetGrid(engine_local, hue='target', size=5)
+g = sns.FacetGrid(orig, hue='target', size=5)
 g.map(sns.distplot, 'msm', kde=False)
 g.set(yscale='log')
 g.add_legend()
-plt.title('MSM score for targets and decoys')
+g.set_title('MSM score for targets and decoys')
+g.savefig(name + '.png')
 
 # Load rescore results
 rescored_new = pd.read_csv('results.csv')
@@ -44,7 +46,7 @@ plt.figure(figsize=(15,5))
 
 plt.plot(nids_msm, fdr_levels, label='msm')
 plt.plot(nids_svm, fdr_levels, label='all-at-once')
-plt.plot(nids_engine, np.unique(engine_local.fdr), label='msm_engine')
+plt.plot(nids_engine, np.unique(orig.fdr), label='msm_engine')
 
 fdrs_new = []
 nids_new = []
@@ -94,7 +96,7 @@ plt.legend(loc='best')
 plt.title("Number of annotations vs FDR trade-off, each subset in the new re-scoring approach")
 
 # Venn diagrams
-local_ids = set(engine_local[engine_local.above_fdr == 1].sf_add)
+local_ids = set(orig[orig.above_fdr == 1].sf_add)
 
 rescore_id = set(rescored_new[rescored_new.combined<=0.10].SpecId)
 
@@ -112,7 +114,7 @@ f, ax = plt.subplots(1,3, figsize=(15,5))
 
 f.suptitle('Overlap in annotations per target adduct: Local and Remote METASPACE engine', fontsize=14)
 for i, t in enumerate(target_adducts):
-    local_ids = set(engine_local[(engine_local.above_fdr == 1) & (engine_local.adduct == t)].sf_add)
+    local_ids = set(orig[(orig.above_fdr == 1) & (orig.adduct == t)].sf_add)
 
     rescore_id = set(rescored[(rescored.adduct == t) & (rescored.final_score > thresh)].sf_add)
 
