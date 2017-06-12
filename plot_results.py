@@ -7,7 +7,6 @@ import seaborn as sns
 import sys
 import argparse
 
-#TODO un-hard-code files, replace prints with stdout
 
 parser = argparse.ArgumentParser(description='Semi-supervised improvement of sm-engine scores')
 parser.add_argument('orig', type=str, help='path to original search results')
@@ -70,7 +69,7 @@ orig['target_adduct'] = [r.adduct if r.target == 1 else 'decoy' for _, r in orig
 orig['msm'] = orig['spatial'] * orig['spectral'] * orig['chaos']
 
 # MSM score distribution
-g = sns.FacetGrid(orig, hue='target', size=5)
+g = sns.FacetGrid(orig, hue='target', size=7)
 g.map(sns.distplot, 'msm', kde=False)
 g.set(yscale='log')
 g.add_legend()
@@ -116,10 +115,9 @@ ax.set_ylim([0,1])
 
 plt.savefig(name + '_fdrplot.png')
 sys.stdout.write("Saving FDR plot\n")
-asdfg
 
 # Subset FDR plot
-plt.figure(figsize=(15,5))
+f, ax = plt.subplots(1,1, figsize=(15,5))
 
 rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:])
 
@@ -128,23 +126,27 @@ for r in rescored_nids.iterrows():
     for c in rescored_nids.columns:
         rescored_nids.loc[fdr, c] = np.sum(resc[c] < fdr)
 
-plt.plot(rescored_nids.combined, rescored_nids.index.values, label='median')
+ax.plot(rescored_nids.combined, rescored_nids.index.values, label='median')
 
-for c in rescored_nids.columns:
-    plt.plot(rescored_nids[c], rescored_nids.index.values, label='subset '+c, alpha=0.5)
+for c in rescored_nids.columns[:-1]:
+    ax.plot(rescored_nids[c], rescored_nids.index.values, label='subset '+c, alpha=0.5)
 
 
-plt.plot(np.linspace(0,np.max(rescored_nids.combined), np.max(rescored_nids.combined)),
-         [0.1]*np.max(rescored_nids.combined), label='10% FDR line', color='black', ls='--')
-plt.plot(np.linspace(0,np.max(rescored_nids.combined), np.max(rescored_nids.combined)),
-         [0.01]*np.max(rescored_nids.combined), label='1% FDR line', color='black', ls='-.')
+ax.plot(np.linspace(0,np.max(rescored_nids.combined), 100), [0.1]*100,
+            label='10% FDR line', color='black', ls='--')
+ax.plot(np.linspace(0,np.max(rescored_nids.combined), 100), [0.01]*100,
+            label='1% FDR line', color='black', ls='-.')
 
-plt.xlim([0,np.max(rescored_nids.combined)])
-plt.ylim([0,1])
-plt.legend(loc='best')
-plt.title("Number of annotations vs FDR trade-off, each subset in the new re-scoring approach")
+ax.set_xlim([0,np.max(rescored_nids.combined)])
+ax.set_ylim([0,1])
+ax.legend(loc='best')
+ax.set_title("Number of annotations vs FDR trade-off, each subset")
+
+plt.savefig(name + '_subsetsfdrplot.png')
+sys.stdout.write("Saving subsets FDR plot\n")
 
 # Venn diagrams
+f, ax = plt.subplots(1,1)#, figsize=(15,5))
 local_ids = set(orig[orig.above_fdr == 1].sf_add)
 
 rescore_id = set(resc[resc.combined<=0.10].SpecId)
@@ -155,8 +157,11 @@ s = (
     len(set.intersection(local_ids, rescore_id))    # AB
 )
 
-v = venn2(subsets=s, set_labels=('engine', 'rescore'))
-plt.title('Overlap in annotations: METASPACE engine and ReScore')
+v = venn2(subsets=s, set_labels=('engine', 'rescore'), ax=ax)
+ax.set_title('Overlap in annotations: METASPACE engine and ReScore')
+
+plt.savefig(name + '_annotationoverlap.png')
+sys.stdout.write("Saving Venn diagram for annotations\n")
 
 # Split by target adduct
 f, ax = plt.subplots(1,3, figsize=(15,5))
@@ -175,7 +180,9 @@ for i, t in enumerate(target_adducts):
 
     v = venn2(subsets=s, set_labels=('engine '+t, 'rescored'+t), ax=ax[i])
 
-plt.show()
+plt.savefig(name + '_annotationoverlapperadduct.png')
+sys.stdout.write("Saving Venn diagram for annotations split by adduct\n")
+kkk
 
 # number of ids at different FDR levels
 def std_dev_median(values):
