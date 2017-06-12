@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib_venn import venn2, venn3
 from collections import Counter
 import seaborn as sns
-import os
+import sys
+import argparse
 
 #TODO un-hard-code files, replace prints with stdout
 
@@ -12,10 +13,49 @@ parser = argparse.ArgumentParser(description='Semi-supervised improvement of sm-
 parser.add_argument('orig', type=str, help='path to original search results')
 parser.add_argument('resc', type=str, help='path to rescored results')
 
-sys.stdout.write("\nPlotting rescored results\n")
+sys.stdout.write("\n*Plot ReScored results*\n")
 
 args = parser.parse_args()
 name = args.orig.split('/')[-1].rstrip('.csv')
+
+def get_FDR_threshold(pos, neg, thr=0.10):
+    """
+    Gets the score threshold that permits a defined FDR. FDR is calculated as
+    ((# decoys > X/# decoys)/(#targets > X / # targets)).
+    :param pos: pandas DF column [label] elements where [label] is [positive]
+    :param neg: pandas DF column [label] elements where [label] is [negative]
+    :param thr: the permitted FDR. default 10%
+    :return the score of the positive instance that allows the specified
+                            percentage of false discoveries to be scored higher
+    """
+    # order scores in ascending order
+    spos = sorted(pos)
+    sneg = sorted(neg)
+    # counters
+    c_pos = 0
+    c_neg = 0
+    # total number of each
+    len_pos = len(spos)
+    len_neg = len(sneg)
+    while True:
+        if c_pos >= len_pos:
+            break
+        if c_neg >= len_neg:
+            break
+        d = (1.0 * len_neg-c_neg)/len_neg
+        t = (1.0 * len_pos-c_pos)/len_pos
+        # print len_pos, c_pos, t
+        fdr = d/t
+        # print(fdr, c_pos, c_neg)
+        if fdr < thr:
+            return spos[c_pos]
+        if spos[c_pos] < sneg[c_neg]:
+            c_pos += 1
+        elif (c_pos + 1 < len_pos and spos[c_pos] == spos[c_pos + 1]):
+            c_pos += 1
+        else:
+            c_neg += 1
+    return 999
 
 sys.stdout.write("Loading original search results\n")
 orig = pd.read_csv(args.orig, sep='\t')
@@ -34,50 +74,59 @@ g = sns.FacetGrid(orig, hue='target', size=5)
 g.map(sns.distplot, 'msm', kde=False)
 g.set(yscale='log')
 g.add_legend()
-g.set_title('MSM score for targets and decoys')
-g.savefig(name + '.png')
+g.fig.suptitle('MSM score for targets and decoys')
+g.savefig(name + '_msmdistribution.png')
+sys.stdout.write("Saving MSM score distribution\n")
 
-# Load rescore results
-rescored_new = pd.read_csv('results.csv')
+sys.stdout.write("Loading rescored results\n")
+resc = pd.read_csv(args.resc)
 
 # FDR plot
 fdr_levels = np.linspace(0, 1, 101)
-plt.figure(figsize=(15,5))
 
-plt.plot(nids_msm, fdr_levels, label='msm')
-plt.plot(nids_svm, fdr_levels, label='all-at-once')
-plt.plot(nids_engine, np.unique(orig.fdr), label='msm_engine')
+f, ax = plt.subplots(1,1, figsize=(15,5))
 
-fdrs_new = []
-nids_new = []
+nids_engine = []
+nids_msm = []
+nids_resc = []
 
-rescored_new['combined'] = np.median(rescored_new[rescored_new.columns[1:-1]], axis=1)
-for v in rescored_new.sort_values(by='combined')['combined']:
-    fdrs_new.append(v)
-    nids_new.append(len(rescored_new[rescored_new['combined'] <= v]))
+for fdr in fdr_levels:
+    score = get_FDR_threshold(orig[orig.target==1]['msm'], orig[orig.target==0]['msm'], fdr)
+    nids_msm.append(len(orig[(orig.target == 1) & (orig.msm > score)]))
+    nids_resc.append(len(resc[resc['combined'] <= fdr]))
 
-plt.plot(nids_new, fdrs_new, label='sampling & aggregating')
+for fdr in np.unique(orig.fdr):
+    nids_engine.append(len(orig[(orig.target == 1) & (orig.fdr <= fdr)]))
 
-maxlim = np.max([np.max(nids_msm), np.max(nids_svm), np.max(nids_new)])
-plt.plot(np.linspace(0, maxlim, maxlim), [0.1]*maxlim, label='10% FDR line', color='black', ls='--')
-plt.plot(np.linspace(0, maxlim, maxlim), [0.01]*maxlim, label='10% FDR line', color='black', ls='-.')
+maxlim = np.max([np.max(nids_msm), np.max(nids_engine), np.max(nids_resc)])
 
-plt.xlabel('# of annotations')
-plt.ylabel('FDR estimate')
-plt.legend(loc='best')
-plt.title("Number of annotations vs FDR trade-off, MSM, SVM and new ReScoring")
-plt.xlim([0,maxlim])
-plt.ylim([0,1])
+ax.plot(np.linspace(0, maxlim, 100), [0.1]*100, label='10% FDR line', color='black', ls='--')
+ax.plot(np.linspace(0, maxlim, 100), [0.01]*100, label='10% FDR line', color='black', ls='-.')
+
+ax.plot(nids_engine, np.unique(orig.fdr), label='engine (normalized FDR)')
+ax.plot(nids_msm, fdr_levels, label='engine (discretized FDR)')
+ax.plot(nids_resc, fdr_levels, label='rescored')
+
+ax.set_xlabel('# of annotations')
+ax.set_ylabel('FDR estimate')
+ax.legend(loc='best')
+ax.set_title("Number of annotations vs FDR trade-off")
+ax.set_xlim([0,maxlim])
+ax.set_ylim([0,1])
+
+plt.savefig(name + '_fdrplot.png')
+sys.stdout.write("Saving FDR plot\n")
+asdfg
 
 # Subset FDR plot
 plt.figure(figsize=(15,5))
 
-rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=rescored_new.columns[1:])
+rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:])
 
 for r in rescored_nids.iterrows():
     fdr = r[0]
     for c in rescored_nids.columns:
-        rescored_nids.loc[fdr, c] = np.sum(rescored_new[c] < fdr)
+        rescored_nids.loc[fdr, c] = np.sum(resc[c] < fdr)
 
 plt.plot(rescored_nids.combined, rescored_nids.index.values, label='median')
 
@@ -98,7 +147,7 @@ plt.title("Number of annotations vs FDR trade-off, each subset in the new re-sco
 # Venn diagrams
 local_ids = set(orig[orig.above_fdr == 1].sf_add)
 
-rescore_id = set(rescored_new[rescored_new.combined<=0.10].SpecId)
+rescore_id = set(resc[resc.combined<=0.10].SpecId)
 
 s = (
     len(local_ids.difference(rescore_id)),    # Ab
@@ -135,12 +184,12 @@ def std_dev_median(values):
 fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot(1,1,1)
 
-rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=rescored_new.columns[1:])
+rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:])
 
 for r in rescored_nids.iterrows():
     fdr = r[0]
     for c in rescored_nids.columns:
-        rescored_nids.loc[fdr, c] = np.sum(rescored_new[c] < fdr)
+        rescored_nids.loc[fdr, c] = np.sum(resc[c] < fdr)
 
 fdrs = [rescored_nids.index[9], rescored_nids.index[49], rescored_nids.index[99],
         rescored_nids.index[149], rescored_nids.index[199]]
@@ -171,7 +220,7 @@ plt.title("number of identifications at different FDR thresholds")
 fig = plt.figure(figsize=(20,5))
 ax = fig.add_subplot(1,1,1)
 
-n = len(np.unique(rescored_new.adduct))
+n = len(np.unique(resc.adduct))
 width = (1-0.1) / 3
 space = 0
 
@@ -179,13 +228,13 @@ colors = ['royalblue', 'green', 'orange']
 
 leg_prep = ()
 
-for i, target in enumerate(np.unique(rescored_new.adduct)):
-    rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=rescored_new.columns[1:-1])
+for i, target in enumerate(np.unique(resc.adduct)):
+    rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:-1])
 
     for r in rescored_nids.iterrows():
         fdr = r[0]
         for c in rescored_nids.columns:
-            rescored_nids.loc[fdr, c] = np.sum(rescored_new[rescored_new.adduct == target][c] <= fdr)
+            rescored_nids.loc[fdr, c] = np.sum(resc[resc.adduct == target][c] <= fdr)
 
     fdrs = [rescored_nids.index[9], rescored_nids.index[49], rescored_nids.index[99],
             rescored_nids.index[149], rescored_nids.index[199]]
@@ -201,7 +250,7 @@ for i, target in enumerate(np.unique(rescored_new.adduct)):
     leg_prep = leg_prep + (bars[0],)
     space = space+(1.0/n)
 
-ax.legend(leg_prep, tuple(np.unique(rescored_new.adduct)), loc='best')
+ax.legend(leg_prep, tuple(np.unique(resc.adduct)), loc='best')
 
 ax.set_ylabel('# ids')
 ax.set_ylim([0, np.max(nids)+250])
