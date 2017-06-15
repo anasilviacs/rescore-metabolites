@@ -123,7 +123,7 @@ else: sys.stdout.write('intermediate files will be deleted\n')
 if args.decoys: sys.stdout.write("attention! saving decoys' q-values\n")
 
 # fdrs = np.linspace(0.01, 0.30, 30)
-niter = 10
+niter = 20
 
 agg_df = pd.DataFrame()
 if args.decoys: decoy_df = pd.DataFrame()
