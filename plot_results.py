@@ -164,7 +164,7 @@ plt.savefig(name + '_annotationoverlap.png')
 sys.stdout.write("Saving Venn diagram for annotations\n")
 
 # Split by target adduct
-f, ax = plt.subplots(1,3, figsize=(15,5))
+f, ax = plt.subplots(1,len(target_adducts), figsize=(15,5))
 f.suptitle('Overlap in annotations per target adduct', fontsize=14)
 
 resc['adduct'] = ['+'+r.SpecId.split('+')[1] if '+' in r.SpecId else '-'+r.SpecId.split('-')[1] for _,r in resc.iterrows()]
