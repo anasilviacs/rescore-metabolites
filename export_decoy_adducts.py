@@ -16,7 +16,7 @@ from sm.engine.util import SMConfig, logger, proj_root
 
 EXPORT_SEL = ('SELECT adds.sf_id, adds.target_add, f.sf, adds.decoy_add '
               'FROM target_decoy_add adds '
-              'JOIN agg_formula f ON f.id = adds.sf_id '
+              'JOIN agg_formula f ON f.id = adds.sf_id AND adds.db_id = f.db_id '
               'JOIN job j ON j.id = adds.job_id '
               'JOIN dataset ds ON ds.id = j.ds_id AND adds.db_id = f.db_id '
               'WHERE ds.name = %s '
