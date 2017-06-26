@@ -120,25 +120,38 @@ niter = 20
 
 agg_df = pd.DataFrame()
 
+if args.decoys:
+    decoy_df = pd.read_csv(args.decoys)
+    decoy_df['n'] = (list(np.arange(1,21)) * int((len(decoy_df)/20)+1))[:len(decoy_df)]
+    decoy_df['sf_add'] = decoy_df.sf + decoy_df.decoy_add
+
 # Split by target
 for target in target_adducts:
     sys.stdout.write('processing target adduct {}. initial #ids at 10% FDR: {}\n'.format(target,np.sum(data[data.adduct == target].above_fdr)))
     data_pos = data[data.adduct == target]
 
-    # build a decoy DataFrame
-    data_neg = pd.DataFrame(columns=data_pos.columns)
-    for sf in np.unique(data_pos.sf):
-        tmp = data[(data.target == 0) & (data.sf == sf)]
-        if len(tmp) > 0:
-            data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp), niter),:])
-        else: continue
-    data_neg['n'] = (list(np.arange(1,niter+1)) * int((len(data_neg)/niter)+1))[:len(data_neg)]
+    # TODO get decoys from decoy file
+    if args.decoys:
+        dec_df = decoy_df[decoy_df.target_add == target]
 
+
+    else:
+        # build a decoy DataFrame
+        data_neg = pd.DataFrame(columns=data_pos.columns)
+        for sf in np.unique(data_pos.sf):
+            tmp = data[(data.target == 0) & (data.sf == sf)]
+            if len(tmp) > 0:
+                data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp), niter),:])
+            else: continue
+        data_neg['n'] = (list(np.arange(1,niter+1)) * int((len(data_neg)/niter)+1))[:len(data_neg)]
+    print(data_neg.shape)
+    print(data_neg.head())
+    jhg
     tmp = pd.DataFrame(index=data_pos.SpecId)
     tmp_dec = pd.DataFrame(index=data_neg.SpecId)
 
-    for decoy in range(1,niter+1):
-        sys.stdout.write('iteration #{}\n'.format(decoy))
+    for decoy in range(niter):
+        sys.stdout.write('iteration #{}\n'.format(decoy+1))
 
         data_perc = pd.concat([data_pos, data_neg[data_neg.n == decoy]])
 
