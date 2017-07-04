@@ -248,7 +248,7 @@ for i, target in enumerate(np.unique(resc.adduct)):
             rescored_nids.index[149], rescored_nids.index[199]]
     inds = np.arange(len(fdrs))
     nids = [rescored_nids.loc[fdr, 'combined'] for fdr in fdrs]
-    dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) for fdr in fdrs]
+    dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]], rescored_nids.loc[fdr, 'combined'])) for fdr in fdrs]
 
     bars = ax.bar(inds+space, nids, width, yerr=dev_med, ecolor='crimson', tick_label=fdrs,
                   align='center', color=colors[i])
