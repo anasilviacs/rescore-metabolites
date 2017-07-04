@@ -184,8 +184,8 @@ plt.savefig(name + '_annotationoverlappertarget.png')
 sys.stdout.write("Saving Venn diagram for annotations split by adduct\n")
 
 # number of ids at different FDR levels
-def std_dev_median(values):
-    return np.mean(np.absolute(values - np.median(values)))
+def std_dev_median(values, reference):
+    return np.mean(np.absolute(values - reference))
 
 fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot(1,1,1)
@@ -200,7 +200,7 @@ for r in rescored_nids.iterrows():
 fdrs = [rescored_nids.index[9], rescored_nids.index[49], rescored_nids.index[99],
         rescored_nids.index[149], rescored_nids.index[199]]
 nids = [rescored_nids.loc[fdr, 'combined'] for fdr in fdrs]
-dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) for fdr in fdrs]
+dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]], rescored_nids.loc[fdr, 'combined'])) for fdr in fdrs]
 
 bars = ax.bar(np.arange(len(fdrs)), nids, yerr=dev_med, ecolor='crimson', tick_label=fdrs, align='center')
 
