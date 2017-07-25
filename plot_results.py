@@ -126,10 +126,10 @@ for r in rescored_nids.iterrows():
     for c in rescored_nids.columns:
         rescored_nids.loc[fdr, c] = np.sum(resc[c] < fdr)
 
-ax.plot(rescored_nids.combined, rescored_nids.index.values, label='median')
+ax.plot(rescored_nids.combined, rescored_nids.index.values, label='median', linewidth=3)
 
 for c in rescored_nids.columns[:-1]:
-    ax.plot(rescored_nids[c], rescored_nids.index.values, label='subset '+c, alpha=0.5)
+    ax.plot(rescored_nids[c], rescored_nids.index.values, color='black', alpha=0.2)
 
 
 ax.plot(np.linspace(0,np.max(rescored_nids.combined), 100), [0.1]*100,
@@ -235,7 +235,7 @@ space = 0
 colors = ['royalblue', 'green', 'orange']
 
 leg_prep = ()
-
+max_nids = 0
 for i, target in enumerate(np.unique(resc.adduct)):
     rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:-1])
 
@@ -248,6 +248,7 @@ for i, target in enumerate(np.unique(resc.adduct)):
             rescored_nids.index[149], rescored_nids.index[199]]
     inds = np.arange(len(fdrs))
     nids = [rescored_nids.loc[fdr, 'combined'] for fdr in fdrs]
+    max_nids = np.max([max_nids] + nids)
     dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]], rescored_nids.loc[fdr, 'combined'])) for fdr in fdrs]
 
     bars = ax.bar(inds+space, nids, width, yerr=dev_med, ecolor='crimson', tick_label=fdrs,
@@ -261,7 +262,7 @@ for i, target in enumerate(np.unique(resc.adduct)):
 ax.legend(leg_prep, tuple(np.unique(resc.adduct)), loc='best')
 
 ax.set_ylabel('# ids')
-ax.set_ylim([0, np.max(nids)+250])
+ax.set_ylim([0, max_nids*1.25])
 
 ax.set_xticks(inds + (1.0/n))
 ax.set_xticklabels(fdrs)
