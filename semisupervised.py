@@ -72,15 +72,8 @@ sys.stdout.write('loading data...\n')
 name = args.dataset.split('/')[-1].rstrip('.csv')
 data = pd.read_csv(args.dataset, sep='\t')
 
-# Output directories
-savepath = args.dataset.split('/')[0] + '/tests/' + args.dataset.split('/')[-2] + '/'
-if not os.path.exists(savepath + name + '/'):
-    sys.stdout.write('creating folders... \n')
-    os.makedirs(savepath + name + '/')
-    os.makedirs(savepath + name + '/tmp/')
-    os.makedirs(savepath + name + '/data/')
-
-log = open(savepath + name + '/' +name+ '_log.txt', 'w')
+# Output directory
+savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/'
 
 sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
 
@@ -126,7 +119,7 @@ if args.decoys: sys.stdout.write("attention! saving decoys' q-values\n")
 niter = 20
 
 agg_df = pd.DataFrame()
-if args.decoys: decoy_df = pd.DataFrame()
+
 # Split by target
 for target in target_adducts:
     sys.stdout.write('processing target adduct {}. initial #ids at 10% FDR: {}\n'.format(target,np.sum(data[data.adduct == target].above_fdr)))
@@ -139,14 +132,15 @@ for target in target_adducts:
         if len(tmp) > 0:
             data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp), niter),:])
         else: continue
+    data_neg['n'] = (list(np.arange(1,niter+1)) * int((len(data_neg)/niter)+1))[:len(data_neg)]
 
     tmp = pd.DataFrame(index=data_pos.SpecId)
     tmp_dec = pd.DataFrame(index=data_neg.SpecId)
 
-    for decoy in range(niter):
-        sys.stdout.write('iteration #{}\n'.format(decoy+1))
+    for decoy in range(1,niter+1):
+        sys.stdout.write('iteration #{}\n'.format(decoy))
 
-        data_perc = pd.concat([data_pos, data_neg.iloc[decoy::niter,:]])
+        data_perc = pd.concat([data_pos, data_neg[data_neg.n == decoy]])
 
         data_perc['Label'] = data_perc['Label'].astype(int)
         data_perc['ScanNr'] = data_perc['ScanNr'].astype(int)
