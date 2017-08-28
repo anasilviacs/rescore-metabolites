@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 warnings.filterwarnings("ignore")
-np.random.seed(42)
+# np.random.seed(42)
 
 """
 This script takes in a csv file which is the export of a sm-engine search done
@@ -73,7 +73,8 @@ name = args.dataset.split('/')[-1].rstrip('.csv')
 data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directory
-savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/'
+# savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/'
+savepath = args.dataset.split('/')[0] + '/rescore/' + + args.dataset.split('/')[-2] + 'name/'
 
 sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
 
@@ -166,7 +167,7 @@ for target in target_adducts:
 
         pin_path = os.path.join(savepath, name, "{}_{}.pin".format(target, decoy))
         pout_path = os.path.join(savepath, name, "{}_{}.pout".format(target, decoy))
-        if args.decoys: pout_decoys = os.path.join(savepath, name, "{}_{}_decoys.pout".format(target, decoy))
+        if args.decoys: pout_decoys = os.path.join(savepath, "{}_{}_decoys.pout".format(target, decoy))
 
         data_perc.to_csv(pin_path, index=False, sep='\t')
 
@@ -217,4 +218,4 @@ sys.stdout.write('final number of identifications at 10% FDR: {} ({}% difference
 if args.decoys:
     agg_df = pd.concat([agg_df, decoy_df])
 
-agg_df.to_csv(savepath + name +'/results.csv', index=True)
+agg_df.to_csv(savepath +'/results.csv', index=True)
