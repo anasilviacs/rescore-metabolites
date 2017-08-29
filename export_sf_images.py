@@ -45,10 +45,11 @@ if __name__ == "__main__":
     export_rs = db.select(EXPORT_SEL, args.ds_name, args.sf)
 
     export_df = pd.DataFrame(export_rs, columns=['sf', 'adduct', 'peak', 'pxl_inds', 'ints'])
-    export_df['img'] = export_df.apply(lambda r: build_matrix(np.array(r['pxl_inds']),
-                                                              np.array(r['ints']), nrows, ncols), axis=1)
-    export_df.drop(['pxl_inds', 'ints'], axis=1, inplace=True)
+    export_df['img_dims'] = [(img_bounds['y']['min'], img_bounds['y']['max'], img_bounds['x']['min'], img_bounds['x']['max'])] * len(export_df)
+    # export_df['img'] = export_df.apply(lambda r: build_matrix(np.array(r['pxl_inds']),
+    #                                                           np.array(r['ints']), nrows, ncols), axis=1)
+    # export_df.drop(['pxl_inds', 'ints'], axis=1, inplace=True)
     # export_df.to_csv(args.csv_path, index=False)
     # cPickle.dump(export_df, open(args.pkl_path, 'wb'))
-    export_df.to_csv(args.pkl_path)
+    export_df.to_csv(args.pkl_path, index=False)
     logger.info('Exported all images for "%s" sum formula in "%s" dataset into "%s" file', args.sf, args.ds_name, args.pkl_path)
