@@ -16,6 +16,8 @@ sys.stdout.write("\n*Plot ReScored results*\n")
 
 args = parser.parse_args()
 name = args.orig.split('/')[-1].rstrip('.csv')
+savepath = '/'.join(args.resc.split('/')[:-1])
+sys.stdout.write("reults will be saved in {}\n".format(savepath))
 
 def get_FDR_threshold(pos, neg, thr=0.10):
     """
@@ -74,7 +76,7 @@ g.map(sns.distplot, 'msm', kde=False)
 g.set(yscale='log')
 g.add_legend()
 g.fig.suptitle('MSM score for targets and decoys')
-g.savefig(name + '_msmdistribution.png')
+g.savefig(savepath + '/' + name + '_msmdistribution.png')
 sys.stdout.write("Saving MSM score distribution\n")
 
 sys.stdout.write("Loading rescored results\n")
@@ -113,7 +115,7 @@ ax.set_title("Number of annotations vs FDR trade-off")
 ax.set_xlim([0,maxlim])
 ax.set_ylim([0,1])
 
-plt.savefig(name + '_fdrplot.png')
+plt.savefig(savepath + '/' + name + '_fdrplot.png')
 sys.stdout.write("Saving FDR plot\n")
 
 # Subset FDR plot
@@ -142,7 +144,7 @@ ax.set_ylim([0,1])
 ax.legend(loc='best')
 ax.set_title("Number of annotations vs FDR trade-off, each subset")
 
-plt.savefig(name + '_subsetsfdrplot.png')
+plt.savefig(savepath + '/' + name + '_subsetsfdrplot.png')
 sys.stdout.write("Saving subsets FDR plot\n")
 
 # Venn diagrams
@@ -160,7 +162,7 @@ s = (
 v = venn2(subsets=s, set_labels=('engine', 'rescore'), ax=ax)
 ax.set_title('Overlap in annotations: METASPACE engine and ReScore')
 
-plt.savefig(name + '_annotationoverlap.png')
+plt.savefig(savepath + '/' + name + '_annotationoverlap.png')
 sys.stdout.write("Saving Venn diagram for annotations\n")
 
 # Split by target adduct
@@ -180,7 +182,7 @@ for i, t in enumerate(target_adducts):
 
     v = venn2(subsets=s, set_labels=('engine '+t, 'rescored'+t), ax=ax[i])
 
-plt.savefig(name + '_annotationoverlappertarget.png')
+plt.savefig(savepath + '/' + name + '_annotationoverlappertarget.png')
 sys.stdout.write("Saving Venn diagram for annotations split by adduct\n")
 
 # number of ids at different FDR levels
@@ -221,7 +223,7 @@ def autolabel(rects, dev_med):
 autolabel(bars, dev_med)
 
 ax.set_title("Number of identifications at different FDR thresholds")
-plt.savefig(name + '_nids.png')
+plt.savefig(savepath + '/' + name + '_nids.png')
 sys.stdout.write("Saving barplot with number of identifications at different FDRs\n")
 
 # Split by target adduct
@@ -268,5 +270,5 @@ ax.set_xticklabels(fdrs)
 ax.set_xlabel('FDR')
 
 ax.set_title('Number of identifications per target adduct at different FDRs', fontsize=14)
-plt.savefig(name + '_nidspertarget.png')
+plt.savefig(savepath + '/' + name + '_nidspertarget.png')
 sys.stdout.write("Saving barplot with number of identifications at different FDRs split by adduct\n")
