@@ -17,7 +17,7 @@ sys.stdout.write("\n*Plot ReScored results*\n")
 args = parser.parse_args()
 name = args.orig.split('/')[-1].rstrip('.csv')
 savepath = '/'.join(args.resc.split('/')[:-1])
-sys.stdout.write("reults will be saved in {}\n".format(savepath))
+sys.stdout.write("Results will be saved in {}\n".format(savepath))
 
 def get_FDR_threshold(pos, neg, thr=0.10):
     """
@@ -131,7 +131,7 @@ for r in rescored_nids.iterrows():
 ax.plot(rescored_nids.combined, rescored_nids.index.values, label='median')
 
 for c in rescored_nids.columns[:-1]:
-    ax.plot(rescored_nids[c], rescored_nids.index.values, label='subset '+c, alpha=0.5)
+    ax.plot(rescored_nids[c], rescored_nids.index.values, color='orange', alpha=0.3)
 
 
 ax.plot(np.linspace(0,np.max(rescored_nids.combined), 100), [0.1]*100,
