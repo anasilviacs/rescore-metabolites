@@ -74,7 +74,8 @@ data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directory
 # savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/'
-savepath = args.dataset.split('/')[0] + '/rescore/' + + args.dataset.split('/')[-2] + 'name/'
+savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/' + name + '/'
+if not os.path.isdir(savepath): os.mkdir(savepath)
 
 sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
 
@@ -165,8 +166,8 @@ for target in target_adducts:
 
         data_perc = data_perc[['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']]
 
-        pin_path = os.path.join(savepath, name, "{}_{}.pin".format(target, decoy))
-        pout_path = os.path.join(savepath, name, "{}_{}.pout".format(target, decoy))
+        pin_path = os.path.join(savepath, "{}_{}.pin".format(target, decoy))
+        pout_path = os.path.join(savepath, "{}_{}.pout".format(target, decoy))
         if args.decoys: pout_decoys = os.path.join(savepath, "{}_{}_decoys.pout".format(target, decoy))
 
         data_perc.to_csv(pin_path, index=False, sep='\t')
@@ -193,6 +194,7 @@ for target in target_adducts:
                     tmp_dec.loc[sf, str(decoy)] = perc_out[perc_out.PSMId == sf]['q-value'].values[0]
         else:
             sys.stdout.write("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
+            if not args.keep: os.remove(pin_path)
             tmp[str(decoy)] = [None]*len(tmp) # unnecessary, i think
             continue
 
