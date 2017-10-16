@@ -121,6 +121,7 @@ if args.decoys: sys.stdout.write("attention! saving decoys' q-values\n")
 niter = 20
 
 agg_df = pd.DataFrame()
+if args.decoys: decoy_df = pd.DataFrame()
 
 # Split by target
 for target in target_adducts:
