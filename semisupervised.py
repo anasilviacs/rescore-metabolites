@@ -174,7 +174,7 @@ for target in target_adducts:
         data_perc.to_csv(pin_path, index=False, sep='\t')
 
         # Send to Percolator
-        fdr_level = 0.1
+        fdr_level = 0.05
         if args.decoys:
             command = "percolator -v 0 -t {} -F {} -U {} -r {} -B {}\n".format(fdr_level, fdr_level, pin_path, pout_path, pout_decoys)
         else:
