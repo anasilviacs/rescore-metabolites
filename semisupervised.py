@@ -74,7 +74,7 @@ data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directory
 # savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/'
-savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/' + name + '/'
+savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/' + name + '_5pc/'
 if not os.path.isdir(savepath): os.mkdir(savepath)
 
 sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
@@ -84,10 +84,10 @@ target_adducts = [t.lstrip('[').lstrip('"').lstrip("u'").rstrip(",").rstrip(']')
 sys.stdout.write('target adducts are {}\n'.format(target_adducts))
 
 data['target'] = [1 if data.adduct[r] in target_adducts else 0 for r in range(len(data))]
-data['above_fdr'] = [1 if data.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(data))]
+data['above_fdr'] = [1 if data.fdr[r] in [0.01, 0.05] else 0 for r in range(len(data))]
 data['msm'] = data['chaos'] * data['spatial'] * data['spectral']
 ids_init = data.above_fdr.value_counts()[1]
-sys.stdout.write('there are {} targets and {} decoys. of all the targets, {} are above the 10% FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], ids_init))
+sys.stdout.write('there are {} targets and {} decoys. of all the targets, {} are above the 5% FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], ids_init))
 
 # List with all the features used to build the model
 features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
@@ -125,7 +125,7 @@ if args.decoys: decoy_df = pd.DataFrame()
 
 # Split by target
 for target in target_adducts:
-    sys.stdout.write('processing target adduct {}. initial #ids at 10% FDR: {}\n'.format(target,np.sum(data[data.adduct == target].above_fdr)))
+    sys.stdout.write('processing target adduct {}. initial #ids at 5% FDR: {}\n'.format(target,np.sum(data[data.adduct == target].above_fdr)))
     data_pos = data[data.adduct == target]
 
     # build a decoy DataFrame
@@ -207,7 +207,7 @@ for target in target_adducts:
     # take median q-value per hit
     tmp['combined'] = tmp.median(axis=1)
     if args.decoys: tmp_dec['combined'] = tmp_dec.median(axis=1)
-    sys.stdout.write("#ids at FDR < 10%: {}\n".format(len(tmp[tmp['combined'] <= 0.1])))
+    sys.stdout.write("#ids at FDR < 5%: {}\n".format(len(tmp[tmp['combined'] <= 0.05])))
 
     # aggregate results for all adducts
     agg_df = pd.concat([agg_df, tmp])
@@ -215,7 +215,7 @@ for target in target_adducts:
 
 ids_end = len(agg_df[agg_df['combined'] <= 0.1])
 
-sys.stdout.write('final number of identifications at 10% FDR: {} ({}% difference)\n'.format(ids_end, (1.0*ids_end/ids_init)*100))
+sys.stdout.write('final number of identifications at 5% FDR: {} ({}% difference)\n'.format(ids_end, (1.0*ids_end/ids_init)*100))
 
 # Write out results
 if args.decoys:
