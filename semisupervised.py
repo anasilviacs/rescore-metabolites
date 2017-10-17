@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 warnings.filterwarnings("ignore")
-# np.random.seed(42)
+np.random.seed(42)
 
 """
 This script takes in a csv file which is the export of a sm-engine search done
@@ -74,7 +74,7 @@ data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directory
 # savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/'
-savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/' + name + '_5pc/'
+savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/' + name + '/'
 if not os.path.isdir(savepath): os.mkdir(savepath)
 
 sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
