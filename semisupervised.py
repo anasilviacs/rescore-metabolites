@@ -213,7 +213,7 @@ for target in target_adducts:
     agg_df = pd.concat([agg_df, tmp])
     if args.decoys: decoy_df = pd.concat([decoy_df, tmp_dec])
 
-ids_end = len(agg_df[agg_df['combined'] <= 0.1])
+ids_end = len(agg_df[agg_df['combined'] <= 0.05])
 
 sys.stdout.write('final number of identifications at 5% FDR: {} ({}% difference)\n'.format(ids_end, (1.0*ids_end/ids_init)*100))
 
