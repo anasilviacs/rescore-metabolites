@@ -8,6 +8,7 @@ import numpy as np
 
 warnings.filterwarnings("ignore")
 np.random.seed(42)
+FDR_LEVEL = 0.05
 
 """
 This script takes in a csv file which is the export of a sm-engine search done
@@ -84,10 +85,10 @@ target_adducts = [t.lstrip('[').lstrip('"').lstrip("u'").rstrip(",").rstrip(']')
 sys.stdout.write('target adducts are {}\n'.format(target_adducts))
 
 data['target'] = [1 if data.adduct[r] in target_adducts else 0 for r in range(len(data))]
-data['above_fdr'] = [1 if data.fdr[r] in [0.01, 0.05] else 0 for r in range(len(data))]
+data['above_fdr'] = [1 if data.fdr[r] in np.arange(0, FDR_LEVEL, FDR_LEVEL/0.01) else 0 for r in range(len(data))]
 data['msm'] = data['chaos'] * data['spatial'] * data['spectral']
 ids_init = data.above_fdr.value_counts()[1]
-sys.stdout.write('there are {} targets and {} decoys. of all the targets, {} are above the 5% FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], ids_init))
+sys.stdout.write('there are {} targets and {} decoys. of all the targets, {} are above the {} FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], ids_init, FDR_LEVEL))
 
 # List with all the features used to build the model
 features = ['chaos', 'spatial', 'spectral', 'image_corr_01', 'image_corr_02',
@@ -125,7 +126,7 @@ if args.decoys: decoy_df = pd.DataFrame()
 
 # Split by target
 for target in target_adducts:
-    sys.stdout.write('processing target adduct {}. initial #ids at 5% FDR: {}\n'.format(target,np.sum(data[data.adduct == target].above_fdr)))
+    sys.stdout.write('processing target adduct {}. initial #ids at {} FDR: {}\n'.format(target, FDR_LEVEL, np.sum(data[data.adduct == target].above_fdr)))
     data_pos = data[data.adduct == target]
 
     # build a decoy DataFrame
@@ -174,11 +175,10 @@ for target in target_adducts:
         data_perc.to_csv(pin_path, index=False, sep='\t')
 
         # Send to Percolator
-        fdr_level = 0.05
         if args.decoys:
-            command = "percolator -v 0 -t {} -F {} -U {} -r {} -B {}\n".format(fdr_level, fdr_level, pin_path, pout_path, pout_decoys)
+            command = "percolator -v 0 -t {} -F {} -U {} -r {} -B {}\n".format(FDR_LEVEL, FDR_LEVEL, pin_path, pout_path, pout_decoys)
         else:
-            command = "percolator -v 0 -t {} -F {} -U {} -r {}\n".format(fdr_level, fdr_level, pin_path, pout_path)
+            command = "percolator -v 0 -t {} -F {} -U {} -r {}\n".format(FDR_LEVEL, FDR_LEVEL, pin_path, pout_path)
 
         sys.stdout.write('executing: {}'.format(command))
         os.system(command)
@@ -207,18 +207,18 @@ for target in target_adducts:
     # take median q-value per hit
     tmp['combined'] = tmp.median(axis=1)
     if args.decoys: tmp_dec['combined'] = tmp_dec.median(axis=1)
-    sys.stdout.write("#ids at FDR < 5%: {}\n".format(len(tmp[tmp['combined'] <= 0.05])))
+    sys.stdout.write("#ids at FDR < {}: {}\n".format(FDR_LEVEL, len(tmp[tmp['combined'] <= FDR_LEVEL])))
 
     # aggregate results for all adducts
     agg_df = pd.concat([agg_df, tmp])
     if args.decoys: decoy_df = pd.concat([decoy_df, tmp_dec])
 
-ids_end = len(agg_df[agg_df['combined'] <= 0.05])
+ids_end = len(agg_df[agg_df['combined'] <= FDR_LEVEL])
 
-sys.stdout.write('final number of identifications at 5% FDR: {} ({}% difference)\n'.format(ids_end, (1.0*ids_end/ids_init)*100))
+sys.stdout.write('final number of identifications at {} FDR: {} ({}% difference)\n'.format(FDR_LEVEL, ids_end, (1.0*ids_end/ids_init)*100))
 
 # Write out results
 if args.decoys:
     agg_df = pd.concat([agg_df, decoy_df])
 
-agg_df.to_csv(savepath +'/results.csv', index=True)
+agg_df.to_csv(savepath + '/results.csv', index=True)
