@@ -83,9 +83,8 @@ sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name,
 # Adding columns of interest to the dataframe
 target_adducts = [t.lstrip('[').lstrip('"').lstrip("u'").rstrip(",").rstrip(']').rstrip("\'") for t in data.targets[0].split(' ')]
 sys.stdout.write('target adducts are {}\n'.format(target_adducts))
-
 data['target'] = [1 if data.adduct[r] in target_adducts else 0 for r in range(len(data))]
-data['above_fdr'] = [1 if data.fdr[r] in np.arange(0, FDR_LEVEL, FDR_LEVEL/0.01) else 0 for r in range(len(data))]
+data['above_fdr'] = [1 if data.fdr[r] in np.arange(0, FDR_LEVEL+0.01, 0.01) else 0 for r in range(len(data))]
 data['msm'] = data['chaos'] * data['spatial'] * data['spectral']
 ids_init = data.above_fdr.value_counts()[1]
 sys.stdout.write('there are {} targets and {} decoys. of all the targets, {} are above the {} FDR threshold.\n'.format(data.target.value_counts()[1], data.target.value_counts()[0], ids_init, FDR_LEVEL))
