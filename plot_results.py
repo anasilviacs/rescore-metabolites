@@ -73,21 +73,22 @@ orig['target_adduct'] = [r.adduct if r.target == 1 else 'decoy' for _, r in orig
 orig['msm'] = orig['spatial'] * orig['spectral'] * orig['chaos']
 
 # MSM score distribution
+sys.stdout.write("Saving MSM score distribution (log)\n")
 g = sns.FacetGrid(orig, hue='target', size=7)
 g.map(sns.distplot, 'msm', kde=False)
 g.set(yscale='log')
 g.add_legend()
 g.fig.suptitle('MSM score for targets and decoys')
 g.savefig(savepath + '/' + name + '_msmdistribution_log.png')
-sys.stdout.write("Saving MSM score distribution\n")
 
 # MSM score distribution
+sys.stdout.write("Saving MSM score distribution\n")
 g = sns.FacetGrid(orig, hue='target', size=7)
 g.map(sns.distplot, 'msm', kde=False)
 g.add_legend()
 g.fig.suptitle('MSM score for targets and decoys')
 g.savefig(savepath + '/' + name + '_msmdistribution.png')
-sys.stdout.write("Saving MSM score distribution\n")
+
 
 sys.stdout.write("Loading rescored results\n")
 resc = pd.read_csv(args.resc)
@@ -96,6 +97,7 @@ resc['adduct'] = ['+'+r.SpecId.split('+')[1] if '+' in r.SpecId else '-'+r.SpecI
 resc['target'] = [1 if resc.adduct[r] in target_adducts else 0 for r in range(len(resc))]
 
 # FDR plot
+sys.stdout.write("Saving FDR plot\n")
 fdr_levels = np.linspace(0, 1, 101)
 
 f, ax = plt.subplots(1,1, figsize=(15,5))
@@ -129,9 +131,9 @@ ax.set_xlim([0,maxlim])
 ax.set_ylim([0,1])
 
 plt.savefig(savepath + '/' + name + '_fdrplot.png')
-sys.stdout.write("Saving FDR plot\n")
 
 # Subset FDR plot
+sys.stdout.write("Saving subsets FDR plot\n")
 f, ax = plt.subplots(1,1, figsize=(15,5))
 
 rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:-2])
@@ -158,9 +160,9 @@ ax.legend(loc='best')
 ax.set_title("Number of annotations vs FDR trade-off, each subset")
 
 plt.savefig(savepath + '/' + name + '_subsetsfdrplot.png')
-sys.stdout.write("Saving subsets FDR plot\n")
 
 # Venn diagrams
+sys.stdout.write("Saving Venn diagram\n")
 f, ax = plt.subplots(1,1)#, figsize=(15,5))
 local_ids = set(orig[orig.above_fdr == 1].sf_add)
 
@@ -176,9 +178,9 @@ v = venn2(subsets=s, set_labels=('engine', 'rescore'), ax=ax)
 ax.set_title('Overlap in annotations: METASPACE engine and ReScore')
 
 plt.savefig(savepath + '/' + name + '_annotationoverlap.png')
-sys.stdout.write("Saving Venn diagram for annotations\n")
 
 # Split by target adduct
+sys.stdout.write("Saving Venn diagrams split by adduct\n")
 f, ax = plt.subplots(1,len(target_adducts), figsize=(15,5))
 f.suptitle('Overlap in annotations per target adduct', fontsize=14)
 
@@ -195,9 +197,9 @@ for i, t in enumerate(target_adducts):
     v = venn2(subsets=s, set_labels=('engine '+t, 'rescored'+t), ax=ax[i])
 
 plt.savefig(savepath + '/' + name + '_annotationoverlappertarget.png')
-sys.stdout.write("Saving Venn diagram for annotations split by adduct\n")
 
 # number of ids at different FDR levels
+sys.stdout.write("Saving barplot with number of identifications at different FDRs\n")
 def std_dev_median(values):
     return np.mean(np.absolute(values - np.median(values)))
 
@@ -238,9 +240,9 @@ autolabel(bars, dev_med)
 
 ax.set_title("Number of identifications at different FDR thresholds")
 plt.savefig(savepath + '/' + name + '_nids.png')
-sys.stdout.write("Saving barplot with number of identifications at different FDRs\n")
 
 # Split by target adduct
+sys.stdout.write("Saving barplot with number of identifications at different FDRs split by adduct\n")
 fig = plt.figure(figsize=(20,5))
 ax = fig.add_subplot(1,1,1)
 
@@ -288,4 +290,3 @@ ax.set_xlabel('FDR')
 
 ax.set_title('Number of identifications per target adduct at different FDRs', fontsize=14)
 plt.savefig(savepath + '/' + name + '_nidspertarget.png')
-sys.stdout.write("Saving barplot with number of identifications at different FDRs split by adduct\n")
