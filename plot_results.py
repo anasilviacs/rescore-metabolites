@@ -1,12 +1,14 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib_venn import venn2, venn3
-from collections import Counter
-import seaborn as sns
 import sys
 import argparse
+import math
 
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+from matplotlib_venn import venn2, venn3
+from collections import Counter
 
 parser = argparse.ArgumentParser(description='Semi-supervised improvement of sm-engine scores')
 parser.add_argument('orig', type=str, help='path to original search results')
@@ -66,7 +68,7 @@ target_adducts = [t.lstrip('[').lstrip('"').lstrip("u'").rstrip(",").rstrip(']')
 
 orig['sf_add'] = orig['sf'] + orig['adduct']
 orig['target'] = [1 if orig.adduct[r] in target_adducts else 0 for r in range(len(orig))]
-orig['above_fdr'] = [1 if orig.fdr[r] in [0.01, 0.05, 0.10] else 0 for r in range(len(orig))]
+orig['above_fdr'] = [1 if orig.fdr[r] in [0.01, 0.05] else 0 for r in range(len(orig))]
 orig['target_adduct'] = [r.adduct if r.target == 1 else 'decoy' for _, r in orig.iterrows()]
 orig['msm'] = orig['spatial'] * orig['spectral'] * orig['chaos']
 
@@ -76,11 +78,22 @@ g.map(sns.distplot, 'msm', kde=False)
 g.set(yscale='log')
 g.add_legend()
 g.fig.suptitle('MSM score for targets and decoys')
+g.savefig(savepath + '/' + name + '_msmdistribution_log.png')
+sys.stdout.write("Saving MSM score distribution\n")
+
+# MSM score distribution
+g = sns.FacetGrid(orig, hue='target', size=7)
+g.map(sns.distplot, 'msm', kde=False)
+g.add_legend()
+g.fig.suptitle('MSM score for targets and decoys')
 g.savefig(savepath + '/' + name + '_msmdistribution.png')
 sys.stdout.write("Saving MSM score distribution\n")
 
 sys.stdout.write("Loading rescored results\n")
 resc = pd.read_csv(args.resc)
+
+resc['adduct'] = ['+'+r.SpecId.split('+')[1] if '+' in r.SpecId else '-'+r.SpecId.split('-')[1] for _,r in resc.iterrows()]
+resc['target'] = [1 if resc.adduct[r] in target_adducts else 0 for r in range(len(resc))]
 
 # FDR plot
 fdr_levels = np.linspace(0, 1, 101)
@@ -102,7 +115,7 @@ for fdr in np.unique(orig.fdr):
 maxlim = np.max([np.max(nids_msm), np.max(nids_engine), np.max(nids_resc)])
 
 ax.plot(np.linspace(0, maxlim, 100), [0.1]*100, label='10% FDR line', color='black', ls='--')
-ax.plot(np.linspace(0, maxlim, 100), [0.01]*100, label='10% FDR line', color='black', ls='-.')
+ax.plot(np.linspace(0, maxlim, 100), [0.01]*100, label='1% FDR line', color='black', ls='-.')
 
 ax.plot(nids_engine, np.unique(orig.fdr), label='engine (normalized FDR)')
 ax.plot(nids_msm, fdr_levels, label='engine (discretized FDR)')
@@ -121,7 +134,7 @@ sys.stdout.write("Saving FDR plot\n")
 # Subset FDR plot
 f, ax = plt.subplots(1,1, figsize=(15,5))
 
-rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:])
+rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:-2])
 
 for r in rescored_nids.iterrows():
     fdr = r[0]
@@ -151,7 +164,7 @@ sys.stdout.write("Saving subsets FDR plot\n")
 f, ax = plt.subplots(1,1)#, figsize=(15,5))
 local_ids = set(orig[orig.above_fdr == 1].sf_add)
 
-rescore_id = set(resc[resc.combined<=0.10].SpecId)
+rescore_id = set(resc[resc.combined<=0.05].SpecId)
 
 s = (
     len(local_ids.difference(rescore_id)),    # Ab
@@ -169,10 +182,9 @@ sys.stdout.write("Saving Venn diagram for annotations\n")
 f, ax = plt.subplots(1,len(target_adducts), figsize=(15,5))
 f.suptitle('Overlap in annotations per target adduct', fontsize=14)
 
-resc['adduct'] = ['+'+r.SpecId.split('+')[1] if '+' in r.SpecId else '-'+r.SpecId.split('-')[1] for _,r in resc.iterrows()]
 for i, t in enumerate(target_adducts):
     local_ids = set(orig[(orig.above_fdr == 1) & (orig.adduct == t)].sf_add)
-    rescore_id = set(resc[(resc.adduct == t) & (resc.combined <= 0.10)].SpecId)
+    rescore_id = set(resc[(resc.adduct == t) & (resc.combined <= 0.05)].SpecId)
 
     s = (
         len(local_ids.difference(rescore_id)),    # Ab
@@ -197,17 +209,18 @@ rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.colum
 for r in rescored_nids.iterrows():
     fdr = r[0]
     for c in rescored_nids.columns:
-        rescored_nids.loc[fdr, c] = np.sum(resc[c] < fdr)
+        if c in ['adduct', 'target']: continue
+        else: rescored_nids.loc[fdr, c] = np.sum(resc[c] < fdr)
 
 fdrs = [rescored_nids.index[9], rescored_nids.index[49], rescored_nids.index[99],
         rescored_nids.index[149], rescored_nids.index[199]]
 nids = [rescored_nids.loc[fdr, 'combined'] for fdr in fdrs]
 dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) for fdr in fdrs]
 
-bars = ax.bar(np.arange(len(fdrs)), nids, yerr=dev_med, ecolor='crimson', tick_label=fdrs, align='center')
+bars = ax.bar(np.arange(len(fdrs)), nids, yerr=dev_med, ecolor='grey', tick_label=fdrs, align='center')
 
 ax.set_ylabel('# ids')
-ax.set_ylim([0, np.max(nids)*1.2])
+ax.set_ylim([0, (np.max(nids)+np.max(dev_med))*1.10])
 ax.set_xlabel('FDR')
 
 def autolabel(rects, dev_med):
@@ -216,7 +229,8 @@ def autolabel(rects, dev_med):
     """
     for i, rect in enumerate(rects):
         height = rect.get_height()
-        ax.text(rect.get_x() + rect.get_width()/2., 1.1*height,
+        if math.isnan(height): height = 0
+        else: ax.text(rect.get_x() + rect.get_width()/2., 1.1*height,
                 '{} +- {}'.format(int(height), dev_med[i]),
                 ha='center', va='bottom')
 
@@ -230,40 +244,43 @@ sys.stdout.write("Saving barplot with number of identifications at different FDR
 fig = plt.figure(figsize=(20,5))
 ax = fig.add_subplot(1,1,1)
 
-n = len(np.unique(resc.adduct))
-width = (1-0.1) / 3
+n = len(np.unique(target_adducts))
+width = (1-0.1) / len(target_adducts)
 space = 0
 
-colors = ['royalblue', 'green', 'orange']
+colors = cm.Set1(np.linspace(0, 1, len(target_adducts)))
 
 leg_prep = ()
 
-for i, target in enumerate(np.unique(resc.adduct)):
-    rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:-1])
+for i, target in enumerate(target_adducts):
+    rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:-2])
 
     for r in rescored_nids.iterrows():
         fdr = r[0]
         for c in rescored_nids.columns:
-            rescored_nids.loc[fdr, c] = np.sum(resc[resc.adduct == target][c] <= fdr)
+            if c in ['adduct', 'target']: continue
+            else: rescored_nids.loc[fdr, c] = np.sum(resc[resc.adduct == target][c] <= fdr)
 
     fdrs = [rescored_nids.index[9], rescored_nids.index[49], rescored_nids.index[99],
             rescored_nids.index[149], rescored_nids.index[199]]
     inds = np.arange(len(fdrs))
     nids = [rescored_nids.loc[fdr, 'combined'] for fdr in fdrs]
-    dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) for fdr in fdrs]
+    dev_med = [0 if math.isnan(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) else int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) for fdr in fdrs]
+    # dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) for fdr in fdrs]
 
-    bars = ax.bar(inds+space, nids, width, yerr=dev_med, ecolor='crimson', tick_label=fdrs,
+    bars = ax.bar(inds+space, nids, width, yerr=dev_med, ecolor='grey', tick_label=fdrs,
                   align='center', color=colors[i])
 
     autolabel(bars, dev_med)
 
     leg_prep = leg_prep + (bars[0],)
-    space = space+(1.0/n)
+    space += width
+    ymax = np.max(nids)
 
-ax.legend(leg_prep, tuple(np.unique(resc.adduct)), loc='best')
+ax.legend(leg_prep, tuple(target_adducts), loc='best')
 
 ax.set_ylabel('# ids')
-ax.set_ylim([0, np.max(nids)+250])
+ax.set_ylim([0, np.max([ymax, np.max(nids)])*1.25])
 
 ax.set_xticks(inds + (1.0/n))
 ax.set_xticklabels(fdrs)
