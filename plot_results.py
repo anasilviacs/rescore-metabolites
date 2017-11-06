@@ -60,6 +60,20 @@ def get_FDR_threshold(pos, neg, thr=0.10):
             c_neg += 1
     return 999
 
+def std_dev_median(values):
+    return np.mean(np.absolute(values - np.median(values)))
+
+def autolabel(rects, dev_med):
+    """
+    Attach a text label above each bar displaying its height
+    """
+    for i, rect in enumerate(rects):
+        height = rect.get_height()
+        if math.isnan(height): height = 0
+        else: ax.text(rect.get_x() + rect.get_width()/2., 1.1*height,
+                '{} +- {}'.format(int(height), dev_med[i]),
+                ha='center', va='bottom')
+
 sys.stdout.write("Loading original search results\n")
 orig = pd.read_csv(args.orig, sep='\t')
 
@@ -71,6 +85,12 @@ orig['target'] = [1 if orig.adduct[r] in target_adducts else 0 for r in range(le
 orig['above_fdr'] = [1 if orig.fdr[r] in [0.01, 0.05] else 0 for r in range(len(orig))]
 orig['target_adduct'] = [r.adduct if r.target == 1 else 'decoy' for _, r in orig.iterrows()]
 orig['msm'] = orig['spatial'] * orig['spectral'] * orig['chaos']
+
+sys.stdout.write("Loading rescored results\n")
+resc = pd.read_csv(args.resc)
+
+resc['adduct'] = ['+'+r.SpecId.split('+')[1] if '+' in r.SpecId else '-'+r.SpecId.split('-')[1] for _,r in resc.iterrows()]
+resc['target'] = [1 if resc.adduct[r] in target_adducts else 0 for r in range(len(resc))]
 
 # MSM score distribution
 sys.stdout.write("Saving MSM score distribution (log)\n")
@@ -88,13 +108,6 @@ g.map(sns.distplot, 'msm', kde=False)
 g.add_legend()
 g.fig.suptitle('MSM score for targets and decoys')
 g.savefig(savepath + '/' + name + '_msmdistribution.png')
-
-
-sys.stdout.write("Loading rescored results\n")
-resc = pd.read_csv(args.resc)
-
-resc['adduct'] = ['+'+r.SpecId.split('+')[1] if '+' in r.SpecId else '-'+r.SpecId.split('-')[1] for _,r in resc.iterrows()]
-resc['target'] = [1 if resc.adduct[r] in target_adducts else 0 for r in range(len(resc))]
 
 # FDR plot
 sys.stdout.write("Saving FDR plot\n")
@@ -200,8 +213,6 @@ plt.savefig(savepath + '/' + name + '_annotationoverlappertarget.png')
 
 # number of ids at different FDR levels
 sys.stdout.write("Saving barplot with number of identifications at different FDRs\n")
-def std_dev_median(values):
-    return np.mean(np.absolute(values - np.median(values)))
 
 fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot(1,1,1)
@@ -219,22 +230,11 @@ fdrs = [rescored_nids.index[9], rescored_nids.index[49], rescored_nids.index[99]
 nids = [rescored_nids.loc[fdr, 'combined'] for fdr in fdrs]
 dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) for fdr in fdrs]
 
-bars = ax.bar(np.arange(len(fdrs)), nids, yerr=dev_med, ecolor='grey', tick_label=fdrs, align='center')
+bars = ax.bar(np.arange(len(fdrs)), nids, yerr=dev_med, ecolor='crimson', tick_label=fdrs, align='center')
 
 ax.set_ylabel('# ids')
 ax.set_ylim([0, (np.max(nids)+np.max(dev_med))*1.10])
 ax.set_xlabel('FDR')
-
-def autolabel(rects, dev_med):
-    """
-    Attach a text label above each bar displaying its height
-    """
-    for i, rect in enumerate(rects):
-        height = rect.get_height()
-        if math.isnan(height): height = 0
-        else: ax.text(rect.get_x() + rect.get_width()/2., 1.1*height,
-                '{} +- {}'.format(int(height), dev_med[i]),
-                ha='center', va='bottom')
 
 autolabel(bars, dev_med)
 
@@ -249,13 +249,14 @@ ax = fig.add_subplot(1,1,1)
 n = len(np.unique(target_adducts))
 width = (1-0.1) / len(target_adducts)
 space = 0
+ymax = []
 
 colors = cm.Set1(np.linspace(0, 1, len(target_adducts)))
 
 leg_prep = ()
 
 for i, target in enumerate(target_adducts):
-    rescored_nids = pd.DataFrame(index=np.linspace(0.001,1,1000), columns=resc.columns[1:-2])
+    rescored_nids = pd.DataFrame(index=[0.01, 0.05, 0.10, 0.15, 0.20], columns=resc.columns[1:-2])
 
     for r in rescored_nids.iterrows():
         fdr = r[0]
@@ -263,28 +264,27 @@ for i, target in enumerate(target_adducts):
             if c in ['adduct', 'target']: continue
             else: rescored_nids.loc[fdr, c] = np.sum(resc[resc.adduct == target][c] <= fdr)
 
-    fdrs = [rescored_nids.index[9], rescored_nids.index[49], rescored_nids.index[99],
-            rescored_nids.index[149], rescored_nids.index[199]]
+    fdrs = list(rescored_nids.index)
     inds = np.arange(len(fdrs))
     nids = [rescored_nids.loc[fdr, 'combined'] for fdr in fdrs]
     dev_med = [0 if math.isnan(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) else int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) for fdr in fdrs]
     # dev_med = [int(std_dev_median(rescored_nids.loc[fdr, rescored_nids.columns[:-2]])) for fdr in fdrs]
 
-    bars = ax.bar(inds+space, nids, width, yerr=dev_med, ecolor='grey', tick_label=fdrs,
+    bars = ax.bar(x=inds+space, height=nids, width=width, yerr=dev_med, ecolor='grey', tick_label=fdrs,
                   align='center', color=colors[i])
 
     autolabel(bars, dev_med)
 
     leg_prep = leg_prep + (bars[0],)
     space += width
-    ymax = np.max(nids)
+    ymax.append(np.max(nids))
 
 ax.legend(leg_prep, tuple(target_adducts), loc='best')
 
 ax.set_ylabel('# ids')
-ax.set_ylim([0, np.max([ymax, np.max(nids)])*1.25])
+ax.set_ylim([0, np.max(ymax)*1.25])
 
-ax.set_xticks(inds + (1.0/n))
+ax.set_xticks(inds)
 ax.set_xticklabels(fdrs)
 ax.set_xlabel('FDR')
 
