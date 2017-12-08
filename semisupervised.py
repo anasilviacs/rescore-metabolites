@@ -75,7 +75,8 @@ data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directory
 # savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/'
-savepath = '/'.join(args.dataset.split('/')[:-1]) + '/rescored/' + name + '/'
+# savepath = '/'.join(args.dataset.split('/')[:-1]) + '/rescored/' + name + '/'
+savepath = 'data/desi_rep/test/'
 if not os.path.isdir(savepath): os.mkdir(savepath)
 
 sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
@@ -123,19 +124,19 @@ niter = 20
 agg_df = pd.DataFrame()
 if args.decoys: decoy_df = pd.DataFrame()
 
+# build a decoy DataFrame
+data_neg = pd.DataFrame(columns=data.columns)
+for sf in np.unique(data[data.label==1].sf):
+    tmp = data[(data.target == 0) & (data.sf == sf)]
+    if len(tmp) > 0:
+        data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp), niter),:])
+    else: continue
+data_neg['n'] = (list(np.arange(1,niter+1)) * int((len(data_neg)/niter)+1))[:len(data_neg)]
+
 # Split by target
 for target in target_adducts:
     sys.stdout.write('processing target adduct {}. initial #ids at {} FDR: {}\n'.format(target, FDR_LEVEL, np.sum(data[data.adduct == target].above_fdr)))
     data_pos = data[data.adduct == target]
-
-    # build a decoy DataFrame
-    data_neg = pd.DataFrame(columns=data_pos.columns)
-    for sf in np.unique(data_pos.sf):
-        tmp = data[(data.target == 0) & (data.sf == sf)]
-        if len(tmp) > 0:
-            data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp), niter),:])
-        else: continue
-    data_neg['n'] = (list(np.arange(1,niter+1)) * int((len(data_neg)/niter)+1))[:len(data_neg)]
 
     tmp = pd.DataFrame(index=data_pos.SpecId)
     tmp_dec = pd.DataFrame(index=data_neg.SpecId)
@@ -191,10 +192,6 @@ for target in target_adducts:
     agg_df = pd.concat([agg_df, tmp])
     if args.decoys: decoy_df = pd.concat([decoy_df, tmp_dec])
 
-ids_end = len(agg_df[agg_df['combined'] <= FDR_LEVEL])
-
-sys.stdout.write('final number of identifications at {} FDR: {} ({}% difference)\n'.format(FDR_LEVEL, ids_end, (1.0*ids_end/ids_init)*100))
-
 # Read Results: qs is a dict where SpecId are the keys and the values are the q-values
 qs = {}
 for target in target_adducts:
@@ -226,7 +223,7 @@ if not args.keep:
 
 # Calculate median q-value & write results
 out = open(savepath + '/results.csv')
-out.write('sf_adduct,combined')
+out.write('sf_adduct,combined\n')
 
 ids_end = 0
 
