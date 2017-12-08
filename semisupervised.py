@@ -75,7 +75,7 @@ data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directory
 # savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/'
-savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/' + name + '/'
+savepath = '/'.join(args.dataset.split('/')[:-1]) + '/rescored/' + name + '/'
 if not os.path.isdir(savepath): os.mkdir(savepath)
 
 sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
