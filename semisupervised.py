@@ -183,30 +183,9 @@ for target in target_adducts:
         os.system(command)
 
         # Check if Percolator was able to run
-        if os.path.isfile(pout_path):
-            # Read results
-            perc_out = pd.read_csv(pout_path, sep='\t')
-            tmp[str(decoy)] = [perc_out[perc_out.PSMId == sf]['q-value'].values[0] for sf in tmp.index]
-            if args.decoys:
-                perc_out = pd.read_csv(pout_decoys, sep='\t')
-                tmp_dec[str(decoy)] = [None]*len(tmp_dec)
-                for sf in perc_out.PSMId:
-                    tmp_dec.loc[sf, str(decoy)] = perc_out[perc_out.PSMId == sf]['q-value'].values[0]
-        else:
+        if not os.path.isfile(pout_path):
             sys.stdout.write("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
-            if not args.keep: os.remove(pin_path)
-            tmp[str(decoy)] = [None]*len(tmp) # unnecessary, i think
             continue
-
-        if not args.keep:
-            os.remove(pin_path)
-            os.remove(pout_path)
-            if args.decoys: os.remove(pout_decoys)
-
-    # take median q-value per hit
-    tmp['combined'] = tmp.median(axis=1)
-    if args.decoys: tmp_dec['combined'] = tmp_dec.median(axis=1)
-    sys.stdout.write("#ids at FDR < {}: {}\n".format(FDR_LEVEL, len(tmp[tmp['combined'] <= FDR_LEVEL])))
 
     # aggregate results for all adducts
     agg_df = pd.concat([agg_df, tmp])
@@ -216,8 +195,44 @@ ids_end = len(agg_df[agg_df['combined'] <= FDR_LEVEL])
 
 sys.stdout.write('final number of identifications at {} FDR: {} ({}% difference)\n'.format(FDR_LEVEL, ids_end, (1.0*ids_end/ids_init)*100))
 
-# Write out results
-if args.decoys:
-    agg_df = pd.concat([agg_df, decoy_df])
+# Read Results: qs is a dict where SpecId are the keys and the values are the q-values
+qs = {}
+for target in target_adducts:
+    for decoy in range(1,niter+1):
+        pout_path = os.path.join(savepath, "{}_{}.pout".format(target, decoy))
+        pout = open(pout_path)
+        for line in pout:
+            if line.startswith('SpecId'): continue
+            split_line = line.strip().split('\t')
+            if split_line[0] in pred_dict.keys():
+                qs[split_line[0]].append(float(split_line[2]))
+            else:
+                qs[split_line[0]] = [float(split_line[2])]
+        if args.decoys:
+            pout_path = os.path.join(savepath, "{}_{}_decoys.pout".format(target, decoy))
+            pout = open(pout_path)
+            for line in pout:
+                if line.startswith('SpecId'): continue
+                split_line = line.strip().split('\t')
+                if split_line[0] in pred_dict.keys():
+                    qs[split_line[0]].append(float(split_line[2]))
+                else:
+                    qs[split_line[0]] = [float(split_line[2])]
 
-agg_df.to_csv(savepath + '/results.csv', index=True)
+if not args.keep:
+    os.remove(pin_path)
+    os.remove(pout_path)
+    if args.decoys: os.remove(pout_decoys)
+
+# Calculate median q-value & write results
+out = open(savepath + '/results.csv')
+out.write('sf_adduct,combined')
+
+ids_end = 0
+
+for k in qs.keys():
+    v = np.median(qs[k])
+    out.write(k + ',' + v + '\n')
+    if v <= FDR_LEVEL: ids_end += 1
+
+sys.stdout.write('final number of identifications at {} FDR: {} ({}% difference)\n'.format(FDR_LEVEL, ids_end, (1.0*ids_end/ids_init)*100))
