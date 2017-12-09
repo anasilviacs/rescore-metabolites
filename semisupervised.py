@@ -29,59 +29,18 @@ args = parser.parse_args()
 
 sys.stdout.write("\n*ReSCORE METASPACE*\n")
 
-def get_FDR_threshold(pos, neg, thr=0.10):
-    """
-    Gets the score threshold that permits a defined FDR. FDR is calculated as
-    ((#decoys above threshold/#decoys) / (#targets above threshold/#targets).
-    :param pos: pandas DF column [label] elements where [label] is [positive]
-    :param neg: pandas DF column [label] elements where [label] is [negative]
-    :param thr: the permitted FDR. default 10%
-    :return the score of the positive instance that allows the specified
-                            percentage of false discoveries to be scored higher
-    """
-    # order scores in ascending order
-    spos = sorted(pos)
-    sneg = sorted(neg)
-    # counters
-    c_pos = 0
-    c_neg = 0
-    # total number of each
-    len_pos = len(spos)
-    len_neg = len(sneg)
-    while True:
-        if c_pos >= len_pos:
-            break
-        if c_neg >= len_neg:
-            break
-        d = (1.0 * len_neg-c_neg)/len_neg
-        t = (1.0 * len_pos-c_pos)/len_pos
-        # sys.stdout.write len_pos, c_pos, t
-        fdr = d/t
-        # sys.stdout.write(fdr, c_pos, c_neg)
-        if fdr < thr:
-            return spos[c_pos]
-        if spos[c_pos] < sneg[c_neg]:
-            c_pos += 1
-        elif (c_pos + 1 < len_pos and spos[c_pos] == spos[c_pos + 1]):
-            c_pos += 1
-        else:
-            c_neg += 1
-    return 999
-
-# Loading data
+# Load data
 sys.stdout.write('loading data...\n')
 name = args.dataset.split('/')[-1].rstrip('.csv')
 data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directory
-# savepath = args.dataset.split('/')[0] + '/rescored/' + args.dataset.split('/')[-2] + '/'
-# savepath = '/'.join(args.dataset.split('/')[:-1]) + '/rescored/' + name + '/'
 savepath = 'data/desi_rep/test/'
 if not os.path.isdir(savepath): os.mkdir(savepath)
 
 sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
 
-# Adding columns of interest to the dataframe
+# Add columns of interest to the dataframe
 target_adducts = [t.lstrip('[').lstrip('"').lstrip("u'").rstrip(",").rstrip(']').rstrip("\'") for t in data.targets[0].split(' ')]
 sys.stdout.write('target adducts are {}\n'.format(target_adducts))
 data['target'] = [1 if data.adduct[r] in target_adducts else 0 for r in range(len(data))]
@@ -118,22 +77,22 @@ if args.keep: sys.stdout.write('attention! will keep all intermediate files\n')
 else: sys.stdout.write('intermediate files will be deleted\n')
 if args.decoys: sys.stdout.write("attention! saving decoys' q-values\n")
 
-# fdrs = np.linspace(0.01, 0.30, 30)
 niter = 20
 
 agg_df = pd.DataFrame()
 if args.decoys: decoy_df = pd.DataFrame()
 
 # build a decoy DataFrame
+# NOTE would be faster to here define sets of decoys and fetch the actual features later
 data_neg = pd.DataFrame(columns=data.columns)
-for sf in np.unique(data[data.label==1].sf):
+for sf in np.unique(data.sf):
     tmp = data[(data.target == 0) & (data.sf == sf)]
     if len(tmp) > 0:
         data_neg = data_neg.append(tmp.iloc[np.random.randint(0, len(tmp), niter),:])
     else: continue
 data_neg['n'] = (list(np.arange(1,niter+1)) * int((len(data_neg)/niter)+1))[:len(data_neg)]
 
-# Split by target
+# Split by target & run percolator 20 times, once with each decoy set
 for target in target_adducts:
     sys.stdout.write('processing target adduct {}. initial #ids at {} FDR: {}\n'.format(target, FDR_LEVEL, np.sum(data[data.adduct == target].above_fdr)))
     data_pos = data[data.adduct == target]
@@ -148,23 +107,6 @@ for target in target_adducts:
 
         data_perc['Label'] = data_perc['Label'].astype(int)
         data_perc['ScanNr'] = data_perc['ScanNr'].astype(int)
-
-        """
-        threshs = [get_FDR_threshold(data_perc[data_perc.target == 1]['msm'], data_perc[data_perc.target == 0]['msm'], thr=i) for i in fdrs]
-        nids = [len(data_perc[(data_perc.target == 1) & (data_perc.msm > score)]) for score in threshs]
-        nids_threshs = [a > 20 for a in nids]
-
-        # we select the threshold for the minimum of all fdr levels tested that allows for at least 10 identifications
-        # thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
-        nid = list(compress(nids, nids_threshs))[0]
-        thresh = list(compress(threshs, nids_threshs))[0]
-        fdr_level = list(compress(fdrs, nids_threshs))[0]
-
-
-        #threshs = [get_FDR_threshold(data_perc[data_perc.target == 1]['msm'], data_perc[data_perc.target == 0]['msm'], thr=i) for i in fdrs]
-        #thresh = list(compress(threshs, [t != 999 for t in threshs]))[0]
-        #fdr_level = list(compress(fdrs, [t != 999 for t in threshs]))[0]
-        """
 
         data_perc = data_perc[['SpecId', 'Label', 'ScanNr'] + features + ['Peptide', 'Proteins']]
 
@@ -183,53 +125,50 @@ for target in target_adducts:
         sys.stdout.write('executing: {}'.format(command))
         os.system(command)
 
-        # Check if Percolator was able to run
-        if not os.path.isfile(pout_path):
-            sys.stdout.write("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
-            continue
-
-    # aggregate results for all adducts
-    agg_df = pd.concat([agg_df, tmp])
-    if args.decoys: decoy_df = pd.concat([decoy_df, tmp_dec])
-
-# Read Results: qs is a dict where SpecId are the keys and the values are the q-values
+# Read Results: qs is a dict where spec_id are the keys and the values are the q-values
 qs = {}
 for target in target_adducts:
     for decoy in range(1,niter+1):
+        # Check if Percolator was able to run
         pout_path = os.path.join(savepath, "{}_{}.pout".format(target, decoy))
-        pout = open(pout_path)
-        for line in pout:
-            if line.startswith('SpecId'): continue
-            split_line = line.strip().split('\t')
-            if split_line[0] in pred_dict.keys():
-                qs[split_line[0]].append(float(split_line[2]))
-            else:
-                qs[split_line[0]] = [float(split_line[2])]
-        if args.decoys:
-            pout_path = os.path.join(savepath, "{}_{}_decoys.pout".format(target, decoy))
+        if not os.path.isfile(pout_path):
+            sys.stdout.write("Percolator wasn't able to re-score adduct {} (iteration {})\n".format(target, decoy))
+            continue
+        else:
             pout = open(pout_path)
             for line in pout:
-                if line.startswith('SpecId'): continue
+                if line.startswith('PSMId'): continue
                 split_line = line.strip().split('\t')
-                if split_line[0] in pred_dict.keys():
+                if split_line[0] in qs.keys():
                     qs[split_line[0]].append(float(split_line[2]))
                 else:
                     qs[split_line[0]] = [float(split_line[2])]
-
-if not args.keep:
-    os.remove(pin_path)
-    os.remove(pout_path)
-    if args.decoys: os.remove(pout_decoys)
+            if args.decoys:
+                pout_path = os.path.join(savepath, "{}_{}_decoys.pout".format(target, decoy))
+                pout = open(pout_path)
+                for line in pout:
+                    if line.startswith('SpecId'): continue
+                    split_line = line.strip().split('\t')
+                    if split_line[0] in qs.keys():
+                        qs[split_line[0]].append(float(split_line[2]))
+                    else:
+                        qs[split_line[0]] = [float(split_line[2])]
 
 # Calculate median q-value & write results
-out = open(savepath + '/results.csv')
+out = open(savepath + 'results.csv', 'w')
 out.write('sf_adduct,combined\n')
 
 ids_end = 0
 
 for k in qs.keys():
     v = np.median(qs[k])
-    out.write(k + ',' + v + '\n')
+    out.write(k + ',' + str(v) + '\n')
     if v <= FDR_LEVEL: ids_end += 1
 
 sys.stdout.write('final number of identifications at {} FDR: {} ({}% difference)\n'.format(FDR_LEVEL, ids_end, (1.0*ids_end/ids_init)*100))
+
+# Delete files:
+if not args.keep:
+    os.remove(pin_path)
+    os.remove(pout_path)
+    if args.decoys: os.remove(pout_decoys)
