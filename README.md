@@ -1,10 +1,13 @@
 # ReSCORE METASPACE
 
-Take annotations obtained from the METASPACE spatial metabolomics annotation engine and use a semi-supervised method to re-score them.
+Take annotations obtained from the [METASPACE](http://metaspace2020.eu/) spatial metabolomics annotation engine and use a semi-supervised method to re-score them.
 
 This is achieved by taking the most confident target hits along with the decoy hits and training a classifier. This classifier is then used to re-score all of the annotations.
 
-This version uses [Percolator](https://github.com/percolator/percolator).
+#### note
+for the re-scoring approach to work on target-decoy searches, additional features for both targets and decoys must be obtained and stored for each match. Currently, to do so, you need to run a modified version of the engine that can be found [here](https://github.com/anasilviacs/sm-engine). This is a modified version of version 0.4 of the annotation engine. 
+
+This rescoring pipeline uses [Percolator](https://github.com/percolator/percolator).
 
 ### install
 
@@ -13,8 +16,6 @@ Requirements:
 - pandas
 - [Percolator](https://github.com/percolator/percolator)
 
-#### note
-for a re-scoring approach to work on target-decoy searches, both targets and decoys must be obtained from the [METASPACE engine](https://github.com/METASPACE2020/sm-engine). Furthermore, improvements are obtained if additional features are extracted from the spectra-metabolite matches. Currently, to do so, you need to run a modified version of the engine that can be found at [this fork](https://github.com/anasilviacs/sm-engine/tree/extra_features), which relies on an outdated version of the engine (v0.4).
 
 ## re-scoring annotations
 
@@ -38,3 +39,7 @@ python semisupervised.py [path to csv file] [-d] [-k]
 ```
 
 This version of the re-scoring method saves a `csv` with the q-values for each hit over 10 iterations plus the median. There is a possibility to also save the decoy hits' q-values, although give the nature of the sampling process it is unlikely that all of them will have values.
+
+## License
+
+This project is licensed under Apache 2.0 license.
