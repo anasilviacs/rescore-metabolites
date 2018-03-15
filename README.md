@@ -5,7 +5,7 @@ Take annotations obtained from the [METASPACE](http://metaspace2020.eu/) spatial
 This is achieved by taking the most confident target hits along with the decoy hits and training a classifier. This classifier is then used to re-score all of the annotations.
 
 #### note
-for the re-scoring approach to work on target-decoy searches, additional features for both targets and decoys must be obtained and stored for each match. Currently, to do so, you need to run a modified version of the engine that can be found [here](https://github.com/anasilviacs/sm-engine). This is a modified version of version 0.4 of the annotation engine. 
+for the re-scoring approach to work on target-decoy searches, additional features for both targets and decoys must be obtained and stored for each match. Currently, to do so, you need to run a modified version of the engine that can be found at [anasilviacs/sm-engine](https://github.com/anasilviacs/sm-engine). This is a modified version of version 0.4 of the annotation engine; the original and supported version can be found at [METASPACE2020/sm-engine](https://github.com/METASPACE2020/sm-engine). 
 
 This rescoring pipeline uses [Percolator](https://github.com/percolator/percolator).
 
