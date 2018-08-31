@@ -31,7 +31,7 @@ sys.stdout.write("\n*ReSCORE METASPACE*\n")
 
 # Load data
 sys.stdout.write('loading data...\n')
-name = args.dataset.split('/')[-1].rstrip('.tsv')
+name = args.dataset.split('/')[-1].split('.')[0]
 data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directory
