@@ -4,6 +4,12 @@ Take annotations obtained from the [METASPACE](http://metaspace2020.eu/) spatial
 
 **IMPORTANT** Currently, the [METASPACE](http://metaspace2020.eu/) result export includes hits to the target database and the three MSM features, plus the MSM score. For this re-scoring approach to work as described in the accompanying publication, target *and* decoy hits are necessary, plus the additional features described in the paper. To use this rescoring approach, you must execute your search on a modified version of the METASPACE engine that can be found at [anasilviacs/sm-engine](https://github.com/anasilviacs/sm-engine). It should be noted that this is a transitory measure, i.e. a proof of concept rather than a definitive tool, that will be implemented in future [METASPACE](http://metaspace2020.eu/) development cycles.
 
+#### Reproducing results
+To test this pipeline, we provide an example file:
+[MTBLS415 exported search results](http://genesis.ugent.be/uvpublicdata/silvia/MTBLS415/120901101000.csv).
+
+This file is the result from searching one experiment obtained from the MetaboLights repository (accession number [MTBLS415](https://www.ebi.ac.uk/metabolights/MTBLS415)) against [HMDB](http://www.hmdb.ca/) with the modified version of the METASPACE engine found in [anasilviacs/sm-engine](https://github.com/anasilviacs/sm-engine), and exported into a tab-separated file through use of the `export_search_results.py` script provided in this repository.
+
 ----
 
 ## Installation
@@ -20,7 +26,7 @@ If you'd like to execute your own search, please refer to [anasilviacs/sm-engine
 ## Usage
 
 ##### Exporting search results
-After running a search, the results must be exported as a tab-separated, `.tsv` file. To do so, use `export_search_results.py` as:
+After running a search with the modified version of the METASPACE engine found in [anasilviacs/sm-engine](https://github.com/anasilviacs/sm-engine/wiki), the results must be exported as a tab-separated, `.tsv` file. To do so, use the `export_search_results.py` script as follows:
 
 ```
 python export_search_results.py [dataset name] [path to tsv file]
@@ -39,7 +45,7 @@ HMDB	{31173}	[u'6-Hydroxy-1H-indole-3-acetamide']	C10H10N2O2	+Th	0.0	0.0	0.0	0.0
 HMDB	{31173}	[u'6-Hydroxy-1H-indole-3-acetamide']	C10H10N2O2	+Rh	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	-0.000339876	0.0	0.0	-0.994127	-0.00726385	0.747369	0.512321	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	1.64987	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	1.0	0.001238-1	4039	292.98
 ```
 
-##### Rescoring metabolite annotations
+#### Rescoring metabolite annotations
 Execute `semisupervised.py` on the exported tab-separated file::
 
 ```
@@ -50,7 +56,7 @@ python semisupervised.py [path to tsv file] [-d] [-k]
  "-k" is a flag which should be used to keep the intermediate files
 ```
 
-This version of the re-scoring method saves a comma-separated, `results.csv` file median q-value for each metabolite ion over 10 iterations. It is possible to also save the decoy hits' q-values, although give the nature of the sampling process it is unlikely that all of them will have values, and the intermediate q-values (i.e. the ones obtained in each iteration of the method). The simplest version of the output file looks as follows:
+This version of the re-scoring method saves a comma-separated, `results.csv` file with the final (median, called `combined` in the file) q-value for each metabolite ion. It is possible to also save the decoy hits' q-values, although give the nature of the sampling process it is unlikely that all of them will have values, and the intermediate q-values (i.e. the ones obtained in each iteration of the method). The simplest version of the output file looks as follows:
 
 ```
 SpecId,combined
