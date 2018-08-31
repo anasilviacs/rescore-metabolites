@@ -16,6 +16,7 @@ This file is the result from searching one experiment obtained from the MetaboLi
 
 ## Installation
 
+##### Requirements
 To execute this pipeline the following tools and packages are required:
 
 - [Percolator](https://github.com/percolator/percolator)
@@ -24,6 +25,13 @@ To execute this pipeline the following tools and packages are required:
   - Pandas >= 0.20.2
 
 If you'd like to execute your own search, please refer to [anasilviacs/sm-engine](https://github.com/anasilviacs/sm-engine/wiki) for the modified engine's installation and usage instructions.
+
+Clone this repository:
+```
+git clone https://github.com/anasilviacs/rescore-metabolites.git
+```
+
+This command creates the `rescore-metabolites` folder, where all the scripts necessary to run the rescoring pipeline are found.
 
 ## Usage
 
@@ -58,7 +66,7 @@ python semisupervised.py [path to tsv file] [-d] [-k]
  "-k" is a flag which should be used to keep the intermediate files
 ```
 
-This version of the re-scoring method saves a comma-separated, `results.csv` file with the final (median, called `combined` in the file) q-value for each metabolite ion. It is possible to also save the decoy hits' q-values, although give the nature of the sampling process it is unlikely that all of them will have values, and the intermediate q-values (i.e. the ones obtained in each iteration of the method). The simplest version of the output file looks as follows:
+After execution, a folder called `<tsv file name>` is created and a comma-separated, `results.csv` file with the final (median, called `combined` in the file) q-value for each metabolite ion is written in that folder. It is possible to also save the decoy hits' q-values, although give the nature of the sampling process it is unlikely that all of them will have values, and the intermediate q-values (i.e. the ones obtained in each iteration of the method). The simplest version of the output file looks as follows:
 
 ```
 SpecId,combined
