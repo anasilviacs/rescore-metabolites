@@ -35,7 +35,7 @@ name = args.dataset.split('/')[-1].rstrip('.tsv')
 data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directory
-savepath = f'data/thesis_v2/new/{name}/'
+savepath = f'{name}/'
 if not os.path.isdir(savepath): os.mkdir(savepath)
 
 sys.stdout.write(f'dataset {name} loaded; results will be saved at {savepath}\n')
