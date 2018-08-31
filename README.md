@@ -2,6 +2,8 @@
 
 Take annotations obtained from the [METASPACE](http://metaspace2020.eu/) spatial metabolomics annotation engine and use a semi-supervised method to re-score them. This is achieved by taking the most confident target hits along with the decoy hits and training a classifier. This classifier is then used to re-score all of the annotations.
 
+This repository accompanies the manuscript _Data-driven rescoring of metabolite annotations significantly improves sensitivity (Analytical Chemistry, under revision)_.
+
 **IMPORTANT** Currently, the [METASPACE](http://metaspace2020.eu/) result export includes hits to the target database and the three MSM features, plus the MSM score. For this re-scoring approach to work as described in the accompanying publication, target *and* decoy hits are necessary, plus the additional features described in the paper. To use this rescoring approach, you must execute your search on a modified version of the METASPACE engine that can be found at [anasilviacs/sm-engine](https://github.com/anasilviacs/sm-engine). It should be noted that this is a transitory measure, i.e. a proof of concept rather than a definitive tool, that will be implemented in future [METASPACE](http://metaspace2020.eu/) development cycles.
 
 ### Reproducing results
@@ -65,6 +67,10 @@ C10H10S3-H,0.5578665
 C10H11ClFN5O3-H,0.7680545
 C10H12ClN5O3-H,0.736791
 ```
+
+## Contact
+
+Please make the most of [GitHub issues](https://github.com/anasilviacs/rescore-metabolites/issues) for any questions, suggestions or requests for support.
 
 ## License
 
