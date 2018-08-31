@@ -4,7 +4,7 @@ Take annotations obtained from the [METASPACE](http://metaspace2020.eu/) spatial
 
 **IMPORTANT** Currently, the [METASPACE](http://metaspace2020.eu/) result export includes hits to the target database and the three MSM features, plus the MSM score. For this re-scoring approach to work as described in the accompanying publication, target *and* decoy hits are necessary, plus the additional features described in the paper. To use this rescoring approach, you must execute your search on a modified version of the METASPACE engine that can be found at [anasilviacs/sm-engine](https://github.com/anasilviacs/sm-engine). It should be noted that this is a transitory measure, i.e. a proof of concept rather than a definitive tool, that will be implemented in future [METASPACE](http://metaspace2020.eu/) development cycles.
 
-#### Reproducing results
+### Reproducing results
 To test this pipeline, we provide an example file:
 [MTBLS415 exported search results](http://genesis.ugent.be/uvpublicdata/silvia/MTBLS415/120901101000.csv).
 
