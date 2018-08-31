@@ -33,9 +33,9 @@ EXPORT_SEL = EXPORT_SEL + ("m.fdr::text::real, sigma, charge, pts_per_mz, tp.cen
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Exporting search results into a csv file')
+    parser = argparse.ArgumentParser(description='Exporting search results into a tsv file')
     parser.add_argument('ds_name', type=str, help='Dataset name')
-    parser.add_argument('csv_path', type=str, help='Path for the csv file')
+    parser.add_argument('csv_path', type=str, help='Path for the tsv file')
     parser.add_argument('--config', dest='sm_config_path', type=str, help='SM config path')
     parser.set_defaults(sm_config_path=path.join(proj_root(), 'conf/config.json'))
     args = parser.parse_args()

@@ -8,10 +8,10 @@ import numpy as np
 
 warnings.filterwarnings("ignore")
 np.random.seed(42)
-FDR_LEVEL = 0.05
+FDR_LEVEL = 0.1
 
 """
-This script takes in a csv file which is the export of a sm-engine search done
+This script takes in a tsv file which is the export of a sm-engine search done
 with the additional feature extraction. From this output (i.e. annotations),
 we build a linear SVM model which is used to re-score all the annotations.
 This version uses Percolator and treats each target adduct individually, trying
@@ -31,14 +31,14 @@ sys.stdout.write("\n*ReSCORE METASPACE*\n")
 
 # Load data
 sys.stdout.write('loading data...\n')
-name = args.dataset.split('/')[-1].rstrip('.csv')
+name = args.dataset.split('/')[-1].rstrip('.tsv')
 data = pd.read_csv(args.dataset, sep='\t')
 
 # Output directory
-savepath = 'data/desi_rep/test/'
+savepath = f'data/thesis_v2/new/{name}/'
 if not os.path.isdir(savepath): os.mkdir(savepath)
 
-sys.stdout.write('dataset {} loaded; results will be saved at {}\n'.format(name, savepath))
+sys.stdout.write(f'dataset {name} loaded; results will be saved at {savepath}\n')
 
 # Add columns of interest to the dataframe
 target_adducts = [t.lstrip('[').lstrip('"').lstrip("u'").rstrip(",").rstrip(']').rstrip("\'") for t in data.targets[0].split(' ')]
@@ -77,7 +77,7 @@ if args.keep: sys.stdout.write('attention! will keep all intermediate files\n')
 else: sys.stdout.write('intermediate files will be deleted\n')
 if args.decoys: sys.stdout.write("attention! saving decoys' q-values\n")
 
-niter = 20
+niter = 10
 
 agg_df = pd.DataFrame()
 if args.decoys: decoy_df = pd.DataFrame()
@@ -168,7 +168,7 @@ for k in qs.keys():
 sys.stdout.write('final number of identifications at {} FDR: {} ({}% difference)\n'.format(FDR_LEVEL, ids_end, (1.0*ids_end/ids_init)*100))
 
 # Delete files:
-if not args.keep:
-    os.remove(pin_path)
-    os.remove(pout_path)
-    if args.decoys: os.remove(pout_decoys)
+# if not args.keep:
+#     os.remove(pin_path)
+#     os.remove(pout_path)
+#     if args.decoys: os.remove(pout_decoys)
