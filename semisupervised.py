@@ -168,7 +168,7 @@ for k in qs.keys():
 sys.stdout.write('final number of identifications at {} FDR: {} ({}% difference)\n'.format(FDR_LEVEL, ids_end, (1.0*ids_end/ids_init)*100))
 
 # Delete files:
-# if not args.keep:
-#     os.remove(pin_path)
-#     os.remove(pout_path)
-#     if args.decoys: os.remove(pout_decoys)
+ if not args.keep:
+     os.remove(pin_path)
+     os.remove(pout_path)
+     if args.decoys: os.remove(pout_decoys)
