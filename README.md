@@ -1,12 +1,15 @@
 # ReSCORE METASPACE
 
-Take annotations obtained from the [METASPACE](http://metaspace2020.eu/) spatial metabolomics annotation engine and use a semi-supervised method to re-score them. This is achieved by taking the most confident target hits along with the decoy hits and training a classifier. This classifier is then used to re-score all of the annotations.
+This is a proof-of-principle implementation of a method for re-scoring METASPACE annotations to improve the FDR. [METASPACE](http://metaspace2020.eu/) is an engine for metabolite annotations of imaging mass spectrometry data. FDR is the False Discovery Rate and is used in METASPACE to provide results with a given confidence. 
 
-This repository accompanies the manuscript _Data-driven rescoring of metabolite annotations significantly improves sensitivity (Analytical Chemistry, under revision)_.
+Our re-scoring method uses a semi-supervised machine learning approach originally proposed in proteomics. We train a classifier discriminating the most prominent target hits from the most prominent decoy hits and apply this classifier to re-score all annotations.
 
-**IMPORTANT** Currently, the [METASPACE](http://metaspace2020.eu/) result export includes hits to the target database and the three MSM features, plus the MSM score. For this re-scoring approach to work as described in the accompanying publication, target *and* decoy hits are necessary, plus the additional features described in the paper. To use this rescoring approach, you must execute your search on a modified version of the METASPACE engine that can be found at [anasilviacs/sm-engine](https://github.com/anasilviacs/sm-engine). It should be noted that this is a transitory measure, i.e. a proof of concept rather than a definitive tool, that will be implemented in future [METASPACE](http://metaspace2020.eu/) development cycles.
+This repository accompanies the manuscript _Silva et al., Data-driven rescoring of metabolite annotations significantly improves sensitivity, under revision_.
 
-### Reproducing results
+
+**IMPORTANT** This implementation is a prototype implementation and can be installed and executed by a bioinformatician or computer scientist with experience of installing Python software. This software requires a modified version of the METASPACE engine because we needed additional output (both target *and* decoy hits opposite to only target hits output by METASPACE, as well as additional spectral and spatial features) which is available here: [anasilviacs/sm-engine](https://github.com/anasilviacs/sm-engine). 
+
+### Reproducing results from the paper
 To test this pipeline, we provide an example file:
 [MTBLS415 exported search results](http://genesis.ugent.be/uvpublicdata/silvia/MTBLS415/120901101000.csv).
 
@@ -83,3 +86,7 @@ Please make the most of [GitHub issues](https://github.com/anasilviacs/rescore-m
 ## License
 
 This project is licensed under Apache 2.0 license.
+
+## Funding
+
+This work was funded by the European Horizon2020 project METASPACE (no. 634402).
