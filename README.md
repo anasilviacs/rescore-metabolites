@@ -4,7 +4,7 @@ This is a proof-of-principle implementation of a method for re-scoring METASPACE
 
 Our re-scoring method uses a semi-supervised machine learning approach originally proposed in proteomics. We train a classifier discriminating the most prominent target hits from the most prominent decoy hits and apply this classifier to re-score all annotations.
 
-This repository accompanies the manuscript _Silva et al., Data-driven rescoring of metabolite annotations significantly improves sensitivity, under revision_.
+This repository accompanies the manuscript [_Silva et al., Data-driven rescoring of metabolite annotations significantly improves sensitivity, Anal. Chem., Just Accepted Manuscript_](https://pubs.acs.org/doi/10.1021/acs.analchem.8b03224).
 
 
 **IMPORTANT** This implementation is a prototype implementation and can be installed and executed by a bioinformatician or computer scientist with experience of installing Python software. This software requires a modified version of the METASPACE engine because we needed additional output (both target *and* decoy hits opposite to only target hits output by METASPACE, as well as additional spectral and spatial features) which is available here: [anasilviacs/sm-engine](https://github.com/anasilviacs/sm-engine). 
